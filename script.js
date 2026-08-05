@@ -94,8 +94,16 @@ let mustSignIn = false;
 let authMode = 'register';
 let usernameAvailable = false;
 let usernameCheckId = 0;
+let currentAuthUser = null;
 
 function setAuthMessage(message = '', type = '') { authStatus.textContent = message; authStatus.className = `auth-status ${type}`; }
+function translateAuthError(error) {
+  const message = String(error?.message || '').toLowerCase();
+  if (message.includes('rate limit') || message.includes('email rate')) return 'Se alcanzó el límite temporal de correos de confirmación. Espera un momento antes de intentarlo de nuevo o usa otro correo ya registrado.';
+  if (message.includes('already registered') || message.includes('already exists')) return 'Este correo ya tiene una cuenta. Usa “Iniciar sesión”.';
+  if (message.includes('password')) return 'La contraseña debe tener al menos 8 caracteres.';
+  return 'No fue posible crear la cuenta. Revisa tus datos e inténtalo nuevamente.';
+}
 function validEmail() { return /^\S+@\S+\.\S+$/.test(emailInput.value.trim()); }
 function validPassword() { return passwordInput.value.length >= 8; }
 function updateSubmitButton() {
@@ -128,7 +136,9 @@ function openAuthModal(required) { mustSignIn = required; usernameModal.classLis
 function closeAuthModal() { if (mustSignIn) return; usernameModal.classList.remove('open'); document.querySelector('.overlay').classList.remove('open'); }
 async function setLoggedInUser(user) {
   const { data } = await supabaseClient.from('profiles').select('username').eq('id', user.id).maybeSingle();
-  document.querySelector('.account-button small').textContent = data?.username || user.user_metadata?.username || 'Cuenta';
+  currentAuthUser = user; const username = data?.username || user.user_metadata?.username || 'Cuenta';
+  document.querySelector('.account-button small').textContent = username;
+  document.querySelector('#profile-username').textContent = username; document.querySelector('#profile-email').textContent = user.email || '';
   mustSignIn = false; usernameModal.classList.remove('open'); document.querySelector('.overlay').classList.remove('open');
 }
 usernameInput.addEventListener('input', updateUsernameStatus);
@@ -141,7 +151,7 @@ saveUsername.onclick = async () => {
   if (authMode === 'register') {
     const username = usernameInput.value.trim().toLowerCase();
     const { data, error } = await supabaseClient.auth.signUp({ email, password, options: { data: { username }, emailRedirectTo: window.location.href } });
-    if (error) { setAuthMessage(error.message, 'error'); updateSubmitButton(); return; }
+    if (error) { setAuthMessage(translateAuthError(error), 'error'); updateSubmitButton(); return; }
     if (data.session) { await setLoggedInUser(data.user); return; }
     setAuthMode('login');
     setAuthMessage('¡Cuenta creada! Te enviamos un correo para verificarla. Revisa tu bandeja de entrada; si no aparece, busca también en Spam un correo de “Supabase Auth”. Después de verificarlo podrás iniciar sesión.', 'success');
@@ -151,7 +161,11 @@ saveUsername.onclick = async () => {
     await setLoggedInUser(data.user);
   }
 };
-document.querySelector('.account-button').onclick = () => openAuthModal(false);
+function openProfileModal() { document.querySelector('.profile-modal').classList.add('open'); document.querySelector('.overlay').classList.add('open'); }
+function closeProfileModal() { document.querySelector('.profile-modal').classList.remove('open'); document.querySelector('.overlay').classList.remove('open'); }
+document.querySelector('.account-button').onclick = () => currentAuthUser ? openProfileModal() : openAuthModal(false);
 document.querySelector('.close-account').onclick = closeAuthModal;
-document.querySelector('.overlay').onclick = () => { document.querySelector('.cart-panel').classList.remove('open'); document.querySelector('.preset-modal').classList.remove('open'); closeAuthModal(); if (!mustSignIn) document.querySelector('.overlay').classList.remove('open'); };
+document.querySelector('.close-profile').onclick = closeProfileModal;
+document.querySelector('#logout-button').onclick = async () => { if (supabaseClient) await supabaseClient.auth.signOut(); currentAuthUser = null; document.querySelector('.account-button small').textContent = 'Cuenta'; closeProfileModal(); };
+document.querySelector('.overlay').onclick = () => { document.querySelector('.cart-panel').classList.remove('open'); document.querySelector('.preset-modal').classList.remove('open'); document.querySelector('.profile-modal').classList.remove('open'); closeAuthModal(); if (!mustSignIn) document.querySelector('.overlay').classList.remove('open'); };
 if (supabaseClient) { supabaseClient.auth.getSession().then(({ data: { session } }) => session ? setLoggedInUser(session.user) : openAuthModal(false)); } else { openAuthModal(false); }
