@@ -1,11 +1,11 @@
 const products = [
-  { name: 'Clean Amb OD', category: 'Worship', tags: ['Worship','Ambient','Clean'], price: 50, usd: '3.00', art: "linear-gradient(135deg,#0004,#0008),url('assets/clean-amb-od-amp.png') center/cover", badges: ['GP200','GP200LT'], description: 'Este preset está diseñado con un enfoque worship, ambiente y clean. Parte de un tono limpio con profundidad y espacio para acompañar, y añade la opción de activar overdrive para lograr una saturación más intensa cuando la canción lo requiere.', demo: 'https://www.tiktok.com/@carlos_martineztf/video/7669144827019414805', image: 'assets/clean-amb-od-amp.png' },
-  { name: 'Clean Chorus', category: 'Clean', price: 50, usd: '3.00', art: 'linear-gradient(135deg,#29413f,#101516)', badges: ['GP200','GP200LT'] },
-  { name: 'Clean Punch', category: 'Clean', price: 50, usd: '3.00', art: 'linear-gradient(135deg,#243343,#101516)', badges: ['GP200','GP200LT'] },
-  { name: 'Victoria — Averly Morillo', category: 'Worship', price: 50, usd: '3.00', art: 'linear-gradient(135deg,#463724,#17130e)', badges: ['GP200','GP200R'] },
-  { name: 'Preset de regalo', category: 'Especial', price: 0, usd: 'Gratis', art: 'linear-gradient(135deg,#5b472a,#17130e)', badges: ['SIGUE @KAYGUITAR14','GP200'] },
-  { name: 'AC30 • Carol Ann • JC', category: 'Pack', price: 300, usd: '16.50', art: 'linear-gradient(135deg,#5a4328,#17120c)', badges: ['10 PRESETS','GP200'] },
-  { name: 'Essential Tone Pack', category: 'Pack', price: 120, usd: '6.80', art: 'linear-gradient(135deg,#313428,#11120f)', badges: ['PACK','GP200'] }
+  { id: 'clean-amb-od', name: 'Clean Amb OD', category: 'Worship', tags: ['Worship','Ambient','Clean'], price: 50, usd: '3.00', art: "linear-gradient(135deg,#0004,#0008),url('assets/clean-amb-od-amp.png') center/cover", badges: ['GP200','GP200LT'], description: 'Este preset está diseñado con un enfoque worship, ambiente y clean. Parte de un tono limpio con profundidad y espacio para acompañar, y añade la opción de activar overdrive para lograr una saturación más intensa cuando la canción lo requiere.', demo: 'https://www.tiktok.com/@carlos_martineztf/video/7669144827019414805', image: 'assets/clean-amb-od-amp.png' },
+  { id: 'clean-chorus', name: 'Clean Chorus', category: 'Clean', price: 50, usd: '3.00', art: 'linear-gradient(135deg,#29413f,#101516)', badges: ['GP200','GP200LT'] },
+  { id: 'clean-punch', name: 'Clean Punch', category: 'Clean', price: 50, usd: '3.00', art: 'linear-gradient(135deg,#243343,#101516)', badges: ['GP200','GP200LT'] },
+  { id: 'victoria-averly-morillo', name: 'Victoria — Averly Morillo', category: 'Worship', price: 50, usd: '3.00', art: 'linear-gradient(135deg,#463724,#17130e)', badges: ['GP200','GP200R'] },
+  { id: 'preset-regalo', name: 'Preset de regalo', category: 'Especial', price: 0, usd: 'Gratis', art: 'linear-gradient(135deg,#5b472a,#17130e)', badges: ['SIGUE @KAYGUITAR14','GP200'] },
+  { id: 'pack-ac30-carol-jc', name: 'AC30 • Carol Ann • JC', category: 'Pack', price: 300, usd: '16.50', art: 'linear-gradient(135deg,#5a4328,#17120c)', badges: ['10 PRESETS','GP200'] },
+  { id: 'essential-tone-pack', name: 'Essential Tone Pack', category: 'Pack', price: 120, usd: '6.80', art: 'linear-gradient(135deg,#313428,#11120f)', badges: ['PACK','GP200'] }
 ];
 const victoriaPreset = products.find(p => p.name.includes('Victoria'));
 Object.assign(victoriaPreset, {
@@ -101,6 +101,8 @@ let authMode = 'register';
 let usernameAvailable = false;
 let usernameCheckId = 0;
 let currentAuthUser = null;
+let currentProfileName = '';
+let resumeCheckoutAfterAuth = false;
 
 function setAuthMessage(message = '', type = '') { authStatus.textContent = message; authStatus.className = `auth-status ${type}`; }
 function translateAuthError(error) {
@@ -144,12 +146,33 @@ function setAuthMode(mode) {
 }
 function openAuthModal(required) { mustSignIn = required; usernameModal.classList.add('open'); document.querySelector('.overlay').classList.add('open'); document.querySelector('.close-account').style.display = required ? 'none' : ''; if (!isConfigured) setAuthMessage('La conexión de cuentas necesita configurarse antes de usarse.', 'error'); setTimeout(() => emailInput.focus(), 100); }
 function closeAuthModal() { if (mustSignIn) return; usernameModal.classList.remove('open'); document.querySelector('.overlay').classList.remove('open'); }
+function orderStatusLabel(status) { return ({ pending_payment: 'Pendiente de pago', pending_validation: 'Pendiente de validación', payment_approved: 'Pago aprobado', payment_rejected: 'Pago rechazado', cancelled: 'Cancelado', delivered: 'Entregado' })[status] || status; }
+async function refreshProfileOrders() {
+  if (!supabaseClient || !currentAuthUser) return;
+  const history = document.querySelector('#profile-history'); const pending = document.querySelector('#profile-pending');
+  const { data, error } = await supabaseClient.from('orders').select('order_code,status,total_mxn,created_at').order('created_at', { ascending: false }).limit(8);
+  if (error || !data) return; // La tabla se activa al ejecutar supabase-orders-setup.sql.
+  const paid = data.filter(order => ['payment_approved', 'delivered'].includes(order.status));
+  const open = data.filter(order => ['pending_payment', 'pending_validation'].includes(order.status));
+  const render = (orders, emptyTitle, emptyCopy, icon) => orders.length
+    ? orders.map(order => `<div class="profile-order"><b>${order.order_code}</b><span>${orderStatusLabel(order.status)}</span><small>$${order.total_mxn} MXN</small></div>`).join('')
+    : `<span>${icon}</span><b>${emptyTitle}</b><small>${emptyCopy}</small>`;
+  history.innerHTML = render(paid, 'Aún no tienes compras registradas.', 'Tus presets aparecerán aquí cuando se confirme tu pago.', '◌');
+  pending.innerHTML = render(open, 'No tienes pedidos pendientes.', 'Cuando solicites un preset, podrás seguirlo desde aquí.', '◷');
+}
 async function setLoggedInUser(user) {
   const { data } = await supabaseClient.from('profiles').select('username').eq('id', user.id).maybeSingle();
   currentAuthUser = user; const username = data?.username || user.user_metadata?.username || 'Cuenta';
+  currentProfileName = username;
   document.querySelector('.account-button small').textContent = username;
   document.querySelector('#profile-username').textContent = username; document.querySelector('#profile-email').textContent = user.email || '';
   mustSignIn = false; usernameModal.classList.remove('open'); document.querySelector('.overlay').classList.remove('open');
+  refreshProfileOrders();
+  document.dispatchEvent(new CustomEvent('kayguitar:authenticated'));
+  if (resumeCheckoutAfterAuth) {
+    resumeCheckoutAfterAuth = false;
+    setTimeout(() => window.KayGuitarCheckout?.open(), 0);
+  }
 }
 usernameInput.addEventListener('input', updateUsernameStatus);
 emailInput.addEventListener('input', updateSubmitButton); passwordInput.addEventListener('input', updateSubmitButton); confirmPasswordInput.addEventListener('input', updateSubmitButton);
@@ -172,11 +195,30 @@ saveUsername.onclick = async () => {
     await setLoggedInUser(data.user);
   }
 };
-function openProfileModal() { document.querySelector('.profile-modal').classList.add('open'); document.querySelector('.overlay').classList.add('open'); }
+function openProfileModal() { refreshProfileOrders(); document.querySelector('.profile-modal').classList.add('open'); document.querySelector('.overlay').classList.add('open'); }
 function closeProfileModal() { document.querySelector('.profile-modal').classList.remove('open'); document.querySelector('.overlay').classList.remove('open'); }
 document.querySelector('.account-button').onclick = () => currentAuthUser ? openProfileModal() : openAuthModal(false);
 document.querySelector('.close-account').onclick = closeAuthModal;
 document.querySelector('.close-profile').onclick = closeProfileModal;
-document.querySelector('#logout-button').onclick = async () => { if (supabaseClient) await supabaseClient.auth.signOut(); currentAuthUser = null; document.querySelector('.account-button small').textContent = 'Cuenta'; closeProfileModal(); };
+document.querySelector('#logout-button').onclick = async () => { if (supabaseClient) await supabaseClient.auth.signOut(); currentAuthUser = null; currentProfileName = ''; document.querySelector('.account-button small').textContent = 'Cuenta'; closeProfileModal(); };
 document.querySelector('.overlay').onclick = () => { document.querySelector('.cart-panel').classList.remove('open'); document.querySelector('.preset-modal').classList.remove('open'); document.querySelector('.profile-modal').classList.remove('open'); closeAuthModal(); if (!mustSignIn) document.querySelector('.overlay').classList.remove('open'); };
 if (supabaseClient) { supabaseClient.auth.getSession().then(({ data: { session } }) => session ? setLoggedInUser(session.user) : openAuthModal(false)); } else { openAuthModal(false); }
+
+// API interna compartida con checkout.js. No contiene secretos y evita duplicar
+// la lógica de carrito, sesión y reanudación tras iniciar sesión.
+window.KayGuitarStore = {
+  getCart: () => cart,
+  getClient: () => supabaseClient,
+  getUser: () => currentAuthUser,
+  getDisplayName: () => currentProfileName || currentAuthUser?.user_metadata?.username || 'Cliente',
+  closeCart: () => {
+    document.querySelector('.cart-panel').classList.remove('open');
+    document.querySelector('.overlay').classList.remove('open');
+  },
+  clearCart: () => { cart.splice(0, cart.length); renderCart(); },
+  requireCheckoutAuthentication: () => {
+    resumeCheckoutAfterAuth = true;
+    setAuthMessage('Inicia sesión o crea tu cuenta para continuar al pago. Tu carrito se conservará.', 'error');
+    openAuthModal(true);
+  }
+};
