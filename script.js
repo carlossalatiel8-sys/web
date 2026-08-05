@@ -7,9 +7,42 @@ const products = [
   { name: 'AC30 • Carol Ann • JC', category: 'Pack', price: 300, usd: '16.50', art: 'linear-gradient(135deg,#5a4328,#17120c)', badges: ['10 PRESETS','GP200'] },
   { name: 'Essential Tone Pack', category: 'Pack', price: 120, usd: '6.80', art: 'linear-gradient(135deg,#313428,#11120f)', badges: ['PACK','GP200'] }
 ];
+const victoriaPreset = products.find(p => p.name.includes('Victoria'));
+Object.assign(victoriaPreset, {
+  category: 'Worship',
+  tags: ['Worship', 'Ambient'],
+  art: "linear-gradient(135deg,#0002,#0007),url('assets/victoria-averly-morillo.png') center/cover",
+  image: 'assets/victoria-averly-morillo.png',
+  demo: 'https://www.tiktok.com/@carlos_martineztf/video/7659601569691847957',
+  description: 'Este preset fue pensado para tocar la canción “Victoria” de Averly Morillo, con un enfoque worship y ambient para crear espacios amplios, profundos y expresivos.'
+});
+const cleanChorusPreset = products.find(p => p.name === 'Clean Chorus');
+Object.assign(cleanChorusPreset, {
+  tags: ['Clean', 'Chorus', 'Pop'],
+  art: "linear-gradient(135deg,#0002,#0007),url('assets/clean-chorus-amp.png') center/cover",
+  image: 'assets/clean-chorus-amp.png',
+  demo: 'https://www.tiktok.com/@carlos_martineztf/video/7630749831346048277',
+  description: 'Este preset fue pensado para lograr un limpio brillante, amplio y con chorus envolvente, inspirado en las guitarras de la balada pop mexicana de finales de los años 80 y 90. Ideal para arpegios definidos, acompañamientos con movimiento y melodías con un aire clásico y elegante.'
+});
+const cleanPunchPreset = products.find(p => p.name === 'Clean Punch');
+Object.assign(cleanPunchPreset, {
+  tags: ['Funk', 'Clean', 'Crunch'],
+  art: "linear-gradient(135deg,#0002,#0007),url('assets/clean-punch-amp.png') center/cover",
+  image: 'assets/clean-punch-amp.png',
+  description: 'Este preset está pensado para tocar funk con un ataque firme y muy definido. Su compresión mantiene cada nota pareja y con presencia, mientras que el ligero toque de crunch aporta carácter sin perder claridad. Ideal para rítmicas con groove, acordes con staccato y canciones de alabanza como “En el Nombre de Jesús”.'
+});
+const giftPreset = products.find(p => p.name === 'Preset de regalo');
+Object.assign(giftPreset, {
+  category: 'Worship',
+  tags: ['Worship', 'High Gain', 'Ambient'],
+  art: "linear-gradient(135deg,#0001,#0008),url('assets/preset-de-regalo.png') center/cover",
+  image: 'assets/preset-de-regalo.png',
+  demo: 'https://www.tiktok.com/@carlos_martineztf/video/7670328884759498005',
+  description: 'Para recibir este preset gratis, debes seguir a @kayguitar14 en Instagram y enviar por WhatsApp una captura de pantalla que lo compruebe. El preset está diseñado para worship con un carácter high gain: ofrece ganancia, sustain y definición para líneas melódicas y momentos de mayor intensidad. Conserva un ambiente amplio para que el sonido se mantenga grande, expresivo y listo para destacar en la mezcla.'
+});
 const grid = document.querySelector('#product-grid'); let cart = [];
 function renderProducts(list = products) {
-  grid.innerHTML = list.length ? list.map((p, index) => `<article class="product" data-demo="${products.indexOf(p)}"><div class="product-image" style="--art:${p.art}"><span class="product-tag">${p.category}</span>${p.image ? '' : '<div class="speaker"></div>'}</div><div class="product-body"><h3>${p.name}</h3><div class="badges">${(p.tags || []).map(b => `<span>${b}</span>`).join('')}${p.badges.map(b => `<span>${b}</span>`).join('')}</div><div class="product-bottom"><div class="price"><strong>${p.price ? '$' + p.price : 'GRATIS'}</strong> <small>${p.price ? 'MXN · ≈ $' + p.usd + ' USD' : 'Requiere follow en Instagram'}</small></div><button class="add-button" data-index="${products.indexOf(p)}">+ Añadir</button></div><button class="demo-button" data-demo="${products.indexOf(p)}">Ver descripción y demo ↗</button></div></article>`).join('') : '<p>No encontramos presets con esa búsqueda.</p>';
+  grid.innerHTML = list.length ? list.map((p, index) => `<article class="product" data-demo="${products.indexOf(p)}"><div class="product-image" style="--art:${p.art}"><span class="product-tag">${p.category}</span>${p.image ? '' : '<div class="speaker"></div>'}</div><div class="product-body"><h3>${p.name}</h3><div class="badges">${(p.tags || []).map(b => `<span>${b}</span>`).join('')}${p.badges.map(b => `<span>${b}</span>`).join('')}</div><div class="product-bottom"><div class="price"><strong>${p.price ? '$' + p.price : 'GRATIS'}</strong> <small>${p.price ? 'MXN · ≈ $' + p.usd + ' USD' : 'Sigue @kayguitar14 y envía captura'}</small></div><button class="add-button" data-index="${products.indexOf(p)}">+ Añadir</button></div><button class="demo-button" data-demo="${products.indexOf(p)}">Ver descripción y demo ↗</button></div></article>`).join('') : '<p>No encontramos presets con esa búsqueda.</p>';
 }
 function renderCart() {
   const items = document.querySelector('#cart-items'); const total = cart.reduce((s, p) => s + p.price, 0);
@@ -18,7 +51,7 @@ function renderCart() {
 }
 renderProducts();
 document.querySelector('#search').addEventListener('input', e => { const q=e.target.value.toLowerCase(); renderProducts(products.filter(p=>p.name.toLowerCase().includes(q)||p.category.toLowerCase().includes(q))); });
-document.querySelector('.filters').addEventListener('click', e => { if(!e.target.matches('button')) return; document.querySelectorAll('.filters button').forEach(b=>b.classList.remove('active')); e.target.classList.add('active'); const f=e.target.dataset.filter; document.querySelector('#search').value=''; renderProducts(f==='Todos'?products:products.filter(p=>p.category===f)); });
+document.querySelector('.filters').addEventListener('click', e => { if(!e.target.matches('button')) return; document.querySelectorAll('.filters button').forEach(b=>b.classList.remove('active')); e.target.classList.add('active'); const f=e.target.dataset.filter; document.querySelector('#search').value=''; renderProducts(f==='Todos' ? products : products.filter(p => p.category === f || (p.tags || []).includes(f))); });
 document.addEventListener('click', e => {
   if(e.target.matches('.add-button')) {cart.push(products[e.target.dataset.index]);renderCart();document.querySelector('.cart-panel').classList.add('open');document.querySelector('.overlay').classList.add('open');return;}
   if(e.target.matches('[data-remove]')) {cart.splice(e.target.dataset.remove,1);renderCart();return;}
