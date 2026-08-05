@@ -53,7 +53,17 @@ renderProducts();
 document.querySelector('#search').addEventListener('input', e => { const q=e.target.value.toLowerCase(); renderProducts(products.filter(p=>p.name.toLowerCase().includes(q)||p.category.toLowerCase().includes(q))); });
 document.querySelector('.filters').addEventListener('click', e => { if(!e.target.matches('button')) return; document.querySelectorAll('.filters button').forEach(b=>b.classList.remove('active')); e.target.classList.add('active'); const f=e.target.dataset.filter; document.querySelector('#search').value=''; renderProducts(f==='Todos' ? products : products.filter(p => p.category === f || (p.tags || []).includes(f))); });
 document.addEventListener('click', e => {
-  if(e.target.matches('.add-button')) {cart.push(products[e.target.dataset.index]);renderCart();document.querySelector('.cart-panel').classList.add('open');document.querySelector('.overlay').classList.add('open');return;}
+  const addTarget = e.target.closest('.add-button');
+  if(addTarget) {
+    const product = products[addTarget.dataset.index];
+    if (!product) return;
+    cart.push(product);
+    renderCart();
+    document.querySelector('.preset-modal').classList.remove('open');
+    document.querySelector('.cart-panel').classList.add('open');
+    document.querySelector('.overlay').classList.add('open');
+    return;
+  }
   if(e.target.matches('[data-remove]')) {cart.splice(e.target.dataset.remove,1);renderCart();return;}
   const demoTarget = e.target.closest('[data-demo]');
   if(demoTarget) openPreset(products[demoTarget.dataset.demo]);
@@ -74,10 +84,26 @@ function openPreset(p) {
   document.querySelector('#preset-modal-tags').innerHTML = (p.tags || [p.category]).map(tag => `<span>${tag}</span>`).join('') + p.badges.map(tag => `<span>${tag}</span>`).join('');
   const image = document.querySelector('#preset-modal-image'); image.style.backgroundImage = p.image ? `url('${p.image}')` : p.art;
   const demo = document.querySelector('#preset-demo-link'); demo.href = p.demo || '#'; demo.style.display = p.demo ? 'inline-flex' : 'none';
+  const addButton = document.querySelector('#preset-add-button');
+  addButton.dataset.index = products.indexOf(p);
+  addButton.innerHTML = p.price ? 'Añadir al carrito <i>→</i>' : 'Añadir regalo al carrito <i>→</i>';
   document.querySelector('#preset-demo-note').textContent = p.demo ? 'Abre el video demo en TikTok.' : 'Video demo próximamente.';
   presetModal.classList.add('open'); document.querySelector('.overlay').classList.add('open');
 }
 document.querySelector('.close-preset').onclick=()=>{presetModal.classList.remove('open');document.querySelector('.overlay').classList.remove('open');};
+const suggestionForm = document.querySelector('#suggestion-form');
+suggestionForm?.addEventListener('submit', event => {
+  event.preventDefault();
+  const name = document.querySelector('#suggestion-name').value.trim();
+  const suggestion = document.querySelector('#suggestion-message').value.trim();
+  const status = document.querySelector('#suggestion-status');
+  if (!suggestion) { status.textContent = 'Escribe tu sugerencia antes de enviarla.'; return; }
+  const intro = name ? `Soy ${name}.` : 'Prefiero enviar mi sugerencia sin nombre.';
+  const message = `Hola KAY GUITAR, tengo una sugerencia para la página o el catálogo.\n\n${intro}\n\nSugerencia:\n${suggestion}`;
+  status.textContent = 'Abriendo WhatsApp para enviar tu sugerencia…';
+  window.open(`https://wa.me/5219616523528?text=${encodeURIComponent(message)}`, '_blank', 'noopener');
+  suggestionForm.reset();
+});
 const usernameInput = document.querySelector('#username-input');
 const usernameStatus = document.querySelector('#username-status');
 const saveUsername = document.querySelector('#save-username');
@@ -150,15 +176,29 @@ function orderStatusLabel(status) { return ({ pending_payment: 'Pendiente de pag
 async function refreshProfileOrders() {
   if (!supabaseClient || !currentAuthUser) return;
   const history = document.querySelector('#profile-history'); const pending = document.querySelector('#profile-pending');
-  const { data, error } = await supabaseClient.from('orders').select('order_code,status,total_mxn,created_at').order('created_at', { ascending: false }).limit(8);
+  const { data, error } = await supabaseClient.from('orders').select('id,order_code,payment_method,status,total_mxn,items,created_at').order('created_at', { ascending: false }).limit(8);
   if (error || !data) return; // La tabla se activa al ejecutar supabase-orders-setup.sql.
   const paid = data.filter(order => ['payment_approved', 'delivered'].includes(order.status));
   const open = data.filter(order => ['pending_payment', 'pending_validation'].includes(order.status));
-  const render = (orders, emptyTitle, emptyCopy, icon) => orders.length
-    ? orders.map(order => `<div class="profile-order"><b>${order.order_code}</b><span>${orderStatusLabel(order.status)}</span><small>$${order.total_mxn} MXN</small></div>`).join('')
+  const render = (orders, emptyTitle, emptyCopy, icon, pendingOrders = false) => orders.length
+    ? orders.map(order => {
+      const canContinue = pendingOrders && order.payment_method === 'bank_transfer' && order.status === 'pending_payment';
+      const action = canContinue ? '<small>Continuar y subir comprobante →</small>' : `<small>$${order.total_mxn} MXN</small>`;
+      const tag = canContinue ? 'button' : 'div';
+      const attributes = canContinue ? ` type="button" data-resume-order="${order.id}" aria-label="Continuar pedido ${order.order_code}"` : '';
+      return `<${tag} class="profile-order${canContinue ? ' is-action' : ''}"${attributes}><b>${order.order_code}</b><span>${orderStatusLabel(order.status)}</span>${action}</${tag}>`;
+    }).join('')
     : `<span>${icon}</span><b>${emptyTitle}</b><small>${emptyCopy}</small>`;
   history.innerHTML = render(paid, 'Aún no tienes compras registradas.', 'Tus presets aparecerán aquí cuando se confirme tu pago.', '◌');
-  pending.innerHTML = render(open, 'No tienes pedidos pendientes.', 'Cuando solicites un preset, podrás seguirlo desde aquí.', '◷');
+  pending.innerHTML = render(open, 'No tienes pedidos pendientes.', 'Cuando solicites un preset, podrás seguirlo desde aquí.', '◷', true);
+  pending.onclick = (event) => {
+    const button = event.target.closest('[data-resume-order]');
+    if (!button) return;
+    const selectedOrder = open.find(order => order.id === button.dataset.resumeOrder);
+    if (!selectedOrder) return;
+    closeProfileModal();
+    window.KayGuitarCheckout?.resumeBankTransfer(selectedOrder);
+  };
 }
 async function setLoggedInUser(user) {
   const { data } = await supabaseClient.from('profiles').select('username').eq('id', user.id).maybeSingle();

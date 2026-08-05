@@ -119,6 +119,7 @@
   function showBankDetails(createdOrder) {
     $('#bank-order-code').textContent = createdOrder.order_code;
     $('#bank-total').textContent = mxn(createdOrder.total_mxn);
+    renderBankOrderItems(createdOrder);
     $('#bank-name').textContent = bank.bank || 'Pendiente de configurar';
     $('#bank-holder').textContent = bank.accountHolder || 'Pendiente de configurar';
     $('#bank-clabe').textContent = bank.clabe || 'Pendiente de configurar';
@@ -127,6 +128,76 @@
     cardRow.style.display = bank.cardNumber ? '' : 'none';
     checkoutContent.classList.add('checkout-hidden');
     bankContent.classList.remove('checkout-hidden');
+  }
+
+  function renderBankOrderItems(existingOrder) {
+    const savedItems = Array.isArray(existingOrder.items) ? existingOrder.items : [];
+    const items = savedItems.length
+      ? savedItems.map(item => ({
+        name: item.name || 'Preset',
+        quantity: Number(item.quantity || 1),
+        total: Number(item.line_total_mxn ?? item.unit_price_mxn ?? 0)
+      }))
+      : cartLines().map(line => ({
+        name: line.product.name,
+        quantity: line.quantity,
+        total: line.product.price * line.quantity
+      }));
+
+    const summary = $('#bank-order-summary');
+    const container = $('#bank-order-items');
+    if (!items.length) {
+      summary.classList.add('checkout-hidden');
+      container.innerHTML = '';
+      return;
+    }
+    summary.classList.remove('checkout-hidden');
+    container.innerHTML = items.map(item => `
+      <div class="bank-order-line">
+        <b>${item.name}</b>
+        <span>×${item.quantity}</span>
+        <strong>${mxn(item.total)}</strong>
+      </div>`).join('');
+  }
+
+  // Un pedido por transferencia puede retomarse desde "Mi perfil" después de
+  // que el cliente salga a realizar el pago. No se crea otro pedido: se usa el
+  // mismo código y solamente se habilita la carga de su comprobante.
+  function resumeBankTransfer(existingOrder) {
+    if (!store.getUser()) {
+      store.requireCheckoutAuthentication();
+      return;
+    }
+    if (!existingOrder?.id || existingOrder.payment_method !== 'bank_transfer') {
+      window.alert('Este pedido no corresponde a una transferencia bancaria.');
+      return;
+    }
+
+    order = existingOrder;
+    checkoutToken = null;
+    paypalButtons.innerHTML = '';
+    payButton.style.display = '';
+    receiptFile.value = '';
+    receiptUpload.classList.add('checkout-hidden');
+    finishContent.classList.add('checkout-hidden');
+
+    if (existingOrder.status === 'pending_validation') {
+      bankContent.classList.add('checkout-hidden');
+      checkoutContent.classList.add('checkout-hidden');
+      showFinish(
+        existingOrder.order_code,
+        'Comprobante recibido.',
+        'Tu comprobante ya fue enviado y el pago está pendiente de validación. Te avisaremos por correo cuando sea aprobado.'
+      );
+    } else if (existingOrder.status === 'pending_payment') {
+      showBankDetails(existingOrder);
+    } else {
+      window.alert('Este pedido ya no requiere un comprobante.');
+      return;
+    }
+
+    modal.classList.add('open');
+    overlay.classList.add('open');
   }
 
   function configureBankDetails() {
@@ -296,5 +367,5 @@
   $('#submit-receipt-button').addEventListener('click', submitReceipt);
   overlay.addEventListener('click', () => { if (modal.classList.contains('open')) close(); });
 
-  window.KayGuitarCheckout = { open, close };
+  window.KayGuitarCheckout = { open, close, resumeBankTransfer };
 })();
