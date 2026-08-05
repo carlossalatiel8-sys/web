@@ -143,7 +143,8 @@ saveUsername.onclick = async () => {
     const { data, error } = await supabaseClient.auth.signUp({ email, password, options: { data: { username }, emailRedirectTo: window.location.href } });
     if (error) { setAuthMessage(error.message, 'error'); updateSubmitButton(); return; }
     if (data.session) { await setLoggedInUser(data.user); return; }
-    setAuthMode('login'); setAuthMessage('Revisa tu correo y confirma tu cuenta antes de iniciar sesión.', 'success');
+    setAuthMode('login');
+    setAuthMessage('¡Cuenta creada! Te enviamos un correo para verificarla. Revisa tu bandeja de entrada; si no aparece, busca también en Spam un correo de “Supabase Auth”. Después de verificarlo podrás iniciar sesión.', 'success');
   } else {
     const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
     if (error) { setAuthMessage('Correo o contraseña incorrectos.', 'error'); updateSubmitButton(); return; }
