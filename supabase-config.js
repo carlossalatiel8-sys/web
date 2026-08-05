@@ -9,9 +9,9 @@ window.KAY_GUITAR_SUPABASE = {
 // Completa estos datos antes de publicar el checkout.
 window.KAY_GUITAR_CHECKOUT = {
   bank: {
-    bank: 'Pendiente de configurar',
-    accountHolder: 'Pendiente de configurar',
-    clabe: 'Pendiente de configurar',
+    bank: 'Mercado Pago',
+    accountHolder: 'Carlos Salatiel Martinez Jimenes',
+    clabe: '722969020186576200',
     cardNumber: ''
   },
   // Este identificador es público. La clave secreta de PayPal NUNCA va aquí:

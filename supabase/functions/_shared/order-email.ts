@@ -34,27 +34,30 @@ async function receiptAttachment(order: Record<string, unknown>, serviceClient: 
   for (let index = 0; index < bytes.length; index += 0x8000) {
     binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
   }
-  return [{ filename: String(order.receipt_path).split('/').pop() || 'comprobante', content: btoa(binary) }];
+  const filename = String(order.receipt_path).split('/').pop() || 'comprobante';
+  const mimeType = /\.pdf$/i.test(filename) ? 'application/pdf' : /\.png$/i.test(filename) ? 'image/png' : 'image/jpeg';
+  return [{ filename, content: btoa(binary), mimeType }];
 }
 
-async function sendEmail(payload: Record<string, unknown>) {
-  const key = Deno.env.get('RESEND_API_KEY');
-  if (!key) throw new Error('Falta RESEND_API_KEY.');
-  const response = await fetch('https://api.resend.com/emails', {
+async function sendWithGmail(payload: Record<string, unknown>) {
+  const url = Deno.env.get('GMAIL_WEB_APP_URL');
+  const secret = Deno.env.get('GMAIL_WEB_APP_SECRET');
+  if (!url || !secret) throw new Error('Faltan los ajustes seguros de correo de Gmail.');
+  const response = await fetch(url, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ ...payload, secret }),
   });
-  if (!response.ok) throw new Error('No fue posible enviar el correo.');
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result?.ok) throw new Error(result?.error || 'No fue posible enviar el correo desde Gmail.');
 }
 
 /** Envía el correo del cliente y del administrador desde un entorno seguro. */
 export async function sendOrderEmail(order: Record<string, unknown>, event: 'bank_receipt' | 'paypal_approved') {
   const adminEmail = Deno.env.get('ADMIN_EMAIL');
-  const from = Deno.env.get('EMAIL_FROM');
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const serviceKey = Deno.env.get('SB_SERVICE_ROLE_KEY');
-  if (!adminEmail || !from || !supabaseUrl || !serviceKey) throw new Error('Faltan los ajustes de correo del servidor.');
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!adminEmail || !supabaseUrl || !serviceKey) throw new Error('Faltan los ajustes de correo del servidor.');
 
   const serviceClient = createClient(supabaseUrl, serviceKey);
   const items = Array.isArray(order.items) ? order.items as Array<Record<string, unknown>> : [];
@@ -64,18 +67,24 @@ export async function sendOrderEmail(order: Record<string, unknown>, event: 'ban
     : `<p>Hola ${esc(order.customer_name)}.</p><p>Gracias por tu compra. Hemos recibido tu comprobante.</p><p>En unos minutos verificaremos el pago. Una vez aprobado recibirás un segundo correo con tus enlaces de descarga.</p>`;
   const adminHtml = `<p><b>Pedido:</b> ${esc(order.order_code)}</p><p><b>Cliente:</b> ${esc(order.customer_name)}<br /><b>Correo:</b> ${esc(order.customer_email)}</p><p><b>Productos:</b>${productsHtml(items)}</p><p><b>Total:</b> $${esc(order.total_mxn)} MXN<br /><b>Método:</b> ${isPayPal ? 'PayPal' : 'Transferencia bancaria'}<br /><b>Estado:</b> ${esc(statusText[String(order.status)] || order.status)}</p>`;
 
-  await sendEmail({
-    from,
-    to: [String(order.customer_email)],
-    subject: isPayPal ? `Pago aprobado · ${order.order_code}` : `Comprobante recibido · ${order.order_code}`,
-    html: baseEmail(isPayPal ? 'Pago aprobado' : 'Comprobante recibido', customerHtml),
-  });
-  await sendEmail({
-    from,
-    to: [adminEmail],
-    subject: `Nuevo pedido recibido · ${order.order_code}`,
-    html: baseEmail('Nuevo pedido recibido', adminHtml),
-    attachments: await receiptAttachment(order, serviceClient),
+  await sendWithGmail({
+    messages: [
+      {
+        to: String(order.customer_email),
+        subject: isPayPal ? `Pago aprobado · ${order.order_code}` : `Comprobante recibido · ${order.order_code}`,
+        html: baseEmail(isPayPal ? 'Pago aprobado' : 'Comprobante recibido', customerHtml),
+        text: isPayPal
+          ? `Hola ${order.customer_name}. Gracias por tu compra. Tu pago fue aprobado correctamente. En unos minutos recibirás tus enlaces de descarga.`
+          : `Hola ${order.customer_name}. Gracias por tu compra. Recibimos tu comprobante y verificaremos el pago. Después recibirás tus enlaces de descarga.`,
+      },
+      {
+        to: adminEmail,
+        subject: `Nuevo pedido recibido · ${order.order_code}`,
+        html: baseEmail('Nuevo pedido recibido', adminHtml),
+        text: `Pedido ${order.order_code}. Cliente: ${order.customer_name}. Total: $${order.total_mxn} MXN.`,
+        attachments: await receiptAttachment(order, serviceClient),
+      },
+    ],
   });
 }
 
@@ -83,7 +92,7 @@ export async function sendOrderEmail(order: Record<string, unknown>, event: 'ban
 // en la base de datos, por lo que recargar una pantalla no duplica correos.
 export async function sendUniqueOrderEmail(order: Record<string, unknown>, event: 'bank_receipt' | 'paypal_approved') {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const serviceKey = Deno.env.get('SB_SERVICE_ROLE_KEY');
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (!supabaseUrl || !serviceKey) throw new Error('Faltan los ajustes seguros del servidor.');
   const serviceClient = createClient(supabaseUrl, serviceKey);
   const { error: reserveError } = await serviceClient

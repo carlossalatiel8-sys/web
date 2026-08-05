@@ -29,7 +29,7 @@ Deno.serve(async (request) => {
     if (paypalCapture.status !== 'COMPLETED') throw new Error('PayPal no confirmó el pago.');
     const captureId = paypalCapture.purchase_units?.[0]?.payments?.captures?.[0]?.id || null;
 
-    const serviceClient = createClient(Deno.env.get('SUPABASE_URL') || '', Deno.env.get('SB_SERVICE_ROLE_KEY') || '');
+    const serviceClient = createClient(Deno.env.get('SUPABASE_URL') || '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '');
     const { data: approvedOrder, error: updateError } = await serviceClient
       .from('orders')
       .update({ status: 'payment_approved', paypal_capture_id: captureId, paid_at: new Date().toISOString() })

@@ -53,19 +53,14 @@ Para hacer pruebas antes de vender, usa primero credenciales **Sandbox** y cambi
 `PAYPAL_ENVIRONMENT` a `sandbox`. Cuando todo esté probado, usa Live en ambos
 lugares.
 
-## 4. Activar correos al cliente y al administrador
+## 4. Activar correos desde Gmail
 
-Usa un proveedor transaccional como [Resend](https://resend.com). Verifica un
-dominio remitente y configura los secretos, sin compartirlos por chat:
-
-```powershell
-npx supabase secrets set RESEND_API_KEY="TU_CLAVE_DE_RESEND" ADMIN_EMAIL="tu-correo@ejemplo.com" EMAIL_FROM="KAY GUITAR <ventas@tudominio.com>"
-npx supabase functions deploy order-email
-```
-
-El correo al administrador contiene pedido, cliente, correo, productos, total,
-método, estado y el comprobante adjunto. Los clientes reciben la confirmación
-correspondiente. La base evita que un reintento mande el mismo aviso dos veces.
+La tienda puede enviar desde un Gmail sin comprar dominio. Sigue el archivo
+`GOOGLE-GMAIL-SETUP.md` para crear el servicio de Google Apps Script y guardar
+su URL y secreto en Supabase. El correo al administrador contiene pedido,
+cliente, correo, productos, total, método, estado y el comprobante adjunto.
+Los clientes reciben la confirmación correspondiente. La base evita que un
+reintento mande el mismo aviso dos veces.
 
 ## 5. Publicar los cambios de la página
 

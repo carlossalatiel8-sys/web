@@ -49,7 +49,7 @@ Deno.serve(async (request) => {
 
     // La llave de servicio sólo existe en el servidor. Se usa después de que
     // RLS confirmó que el pedido pertenece al usuario autenticado.
-    const serviceClient = createClient(Deno.env.get('SUPABASE_URL') || '', Deno.env.get('SB_SERVICE_ROLE_KEY') || '');
+    const serviceClient = createClient(Deno.env.get('SUPABASE_URL') || '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '');
     const { error: updateError } = await serviceClient
       .from('orders')
       .update({ paypal_order_id: paypalOrder.id })
