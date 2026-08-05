@@ -40,7 +40,22 @@ Object.assign(giftPreset, {
   demo: 'https://www.tiktok.com/@carlos_martineztf/video/7670328884759498005',
   description: 'Para recibir este preset gratis, debes seguir a @kayguitar14 en Instagram y enviar por WhatsApp una captura de pantalla que lo compruebe. El preset está diseñado para worship con un carácter high gain: ofrece ganancia, sustain y definición para líneas melódicas y momentos de mayor intensidad. Conserva un ambiente amplio para que el sonido se mantenga grande, expresivo y listo para destacar en la mezcla.'
 });
-const grid = document.querySelector('#product-grid'); let cart = [];
+const CART_STORAGE_KEY = 'kay-guitar-cart-v1';
+function loadSavedCart() {
+  try {
+    const savedIds = JSON.parse(window.localStorage.getItem(CART_STORAGE_KEY) || '[]');
+    if (!Array.isArray(savedIds)) return [];
+    return savedIds.map(id => products.find(product => product.id === id)).filter(Boolean);
+  } catch (_) {
+    return [];
+  }
+}
+function saveCart() {
+  try {
+    window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart.map(product => product.id)));
+  } catch (_) { /* El carrito sigue funcionando aunque el navegador bloquee el almacenamiento. */ }
+}
+const grid = document.querySelector('#product-grid'); let cart = loadSavedCart();
 function renderProducts(list = products) {
   grid.innerHTML = list.length ? list.map((p, index) => `<article class="product" data-demo="${products.indexOf(p)}"><div class="product-image" style="--art:${p.art}"><span class="product-tag">${p.category}</span>${p.image ? '' : '<div class="speaker"></div>'}</div><div class="product-body"><h3>${p.name}</h3><div class="badges">${(p.tags || []).map(b => `<span>${b}</span>`).join('')}${p.badges.map(b => `<span>${b}</span>`).join('')}</div><div class="product-bottom"><div class="price"><strong>${p.price ? '$' + p.price : 'GRATIS'}</strong> <small>${p.price ? 'MXN · ≈ $' + p.usd + ' USD' : 'Sigue @kayguitar14 y envía captura'}</small></div><button class="add-button" data-index="${products.indexOf(p)}">+ Añadir</button></div><button class="demo-button" data-demo="${products.indexOf(p)}">Ver descripción y demo ↗</button></div></article>`).join('') : '<p>No encontramos presets con esa búsqueda.</p>';
 }
@@ -48,8 +63,10 @@ function renderCart() {
   const items = document.querySelector('#cart-items'); const total = cart.reduce((s, p) => s + p.price, 0);
   document.querySelector('#cart-count').textContent = cart.length; document.querySelector('#cart-title-count').textContent = cart.length; document.querySelector('#cart-total').textContent = `$${total} MXN`;
   items.innerHTML = cart.length ? cart.map((p,i) => `<div class="cart-item"><div class="cart-item-art" style="background:${p.art}"></div><div><h4>${p.name}</h4><p>$${p.price} MXN</p><button data-remove="${i}">Quitar</button></div></div>`).join('') : '<p class="empty-cart">Tu carrito está esperando un gran tono.</p>';
+  saveCart();
 }
 renderProducts();
+renderCart();
 document.querySelector('#search').addEventListener('input', e => { const q=e.target.value.toLowerCase(); renderProducts(products.filter(p=>p.name.toLowerCase().includes(q)||p.category.toLowerCase().includes(q))); });
 document.querySelector('.filters').addEventListener('click', e => { if(!e.target.matches('button')) return; document.querySelectorAll('.filters button').forEach(b=>b.classList.remove('active')); e.target.classList.add('active'); const f=e.target.dataset.filter; document.querySelector('#search').value=''; renderProducts(f==='Todos' ? products : products.filter(p => p.category === f || (p.tags || []).includes(f))); });
 document.addEventListener('click', e => {
