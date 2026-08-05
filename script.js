@@ -78,3 +78,79 @@ function openPreset(p) {
   presetModal.classList.add('open'); document.querySelector('.overlay').classList.add('open');
 }
 document.querySelector('.close-preset').onclick=()=>{presetModal.classList.remove('open');document.querySelector('.overlay').classList.remove('open');};
+const usernameInput = document.querySelector('#username-input');
+const usernameStatus = document.querySelector('#username-status');
+const saveUsername = document.querySelector('#save-username');
+const usernameModal = document.querySelector('.account-modal');
+const emailInput = document.querySelector('#email-input');
+const passwordInput = document.querySelector('#password-input');
+const authStatus = document.querySelector('#auth-status');
+const usernameField = document.querySelector('.username-field');
+const reservedNames = ['admin', 'administrador', 'support', 'soporte', 'kayguitar', 'kayu'];
+const supabaseSettings = window.KAY_GUITAR_SUPABASE || {};
+const isConfigured = supabaseSettings.url && supabaseSettings.anonKey && !supabaseSettings.url.startsWith('PEGA_') && !supabaseSettings.anonKey.startsWith('PEGA_');
+const supabaseClient = isConfigured ? window.supabase.createClient(supabaseSettings.url, supabaseSettings.anonKey) : null;
+let mustSignIn = false;
+let authMode = 'register';
+let usernameAvailable = false;
+let usernameCheckId = 0;
+
+function setAuthMessage(message = '', type = '') { authStatus.textContent = message; authStatus.className = `auth-status ${type}`; }
+function validEmail() { return /^\S+@\S+\.\S+$/.test(emailInput.value.trim()); }
+function validPassword() { return passwordInput.value.length >= 8; }
+function updateSubmitButton() {
+  const ready = isConfigured && validEmail() && validPassword() && (authMode === 'login' || usernameAvailable);
+  saveUsername.disabled = !ready;
+}
+async function updateUsernameStatus() {
+  const name = usernameInput.value.trim(); const normalized = name.toLowerCase();
+  const valid = /^[a-zA-Z0-9_-]{3,20}$/.test(name);
+  usernameAvailable = false; updateSubmitButton();
+  if (!name) { usernameStatus.textContent = 'Usa de 3 a 20 caracteres: letras, números, _ o -.'; usernameStatus.className = 'username-status'; return; }
+  if (!valid) { usernameStatus.textContent = 'El nombre debe tener entre 3 y 20 caracteres, sin espacios.'; usernameStatus.className = 'username-status unavailable'; return; }
+  if (reservedNames.includes(normalized)) { usernameStatus.textContent = 'Este nombre de usuario no está disponible.'; usernameStatus.className = 'username-status unavailable'; return; }
+  if (!supabaseClient) { usernameStatus.textContent = 'La conexión de cuentas aún no está configurada.'; usernameStatus.className = 'username-status unavailable'; return; }
+  const requestId = ++usernameCheckId; usernameStatus.textContent = 'Comprobando disponibilidad…'; usernameStatus.className = 'username-status';
+  const { data, error } = await supabaseClient.from('profiles').select('username').eq('username', normalized).maybeSingle();
+  if (requestId !== usernameCheckId) return;
+  if (error) { usernameStatus.textContent = 'No fue posible comprobar el nombre. Intenta de nuevo.'; usernameStatus.className = 'username-status unavailable'; return; }
+  usernameAvailable = !data; usernameStatus.textContent = usernameAvailable ? '✓ Nombre de usuario disponible.' : 'Este nombre de usuario no está disponible.'; usernameStatus.className = `username-status ${usernameAvailable ? 'available' : 'unavailable'}`; updateSubmitButton();
+}
+function setAuthMode(mode) {
+  authMode = mode; const registering = mode === 'register';
+  document.querySelectorAll('[data-auth-mode]').forEach(button => button.classList.toggle('active', button.dataset.authMode === mode));
+  usernameField.style.display = registering ? '' : 'none'; usernameStatus.style.display = registering ? '' : 'none';
+  document.querySelector('#auth-title').innerHTML = registering ? 'Crea tu<br /><em>cuenta.</em>' : 'Inicia<br /><em>sesión.</em>';
+  document.querySelector('#auth-intro').textContent = registering ? 'Tu contraseña es solo para KAY GUITAR; no tiene que ser la de tu correo.' : 'Usa el correo y la contraseña con los que creaste tu cuenta KAY GUITAR.';
+  saveUsername.innerHTML = registering ? 'Crear cuenta <i>→</i>' : 'Entrar <i>→</i>'; passwordInput.autocomplete = registering ? 'new-password' : 'current-password'; setAuthMessage(); updateSubmitButton();
+}
+function openAuthModal(required) { mustSignIn = required; usernameModal.classList.add('open'); document.querySelector('.overlay').classList.add('open'); document.querySelector('.close-account').style.display = required ? 'none' : ''; if (!isConfigured) setAuthMessage('La conexión de cuentas necesita configurarse antes de usarse.', 'error'); setTimeout(() => emailInput.focus(), 100); }
+function closeAuthModal() { if (mustSignIn) return; usernameModal.classList.remove('open'); document.querySelector('.overlay').classList.remove('open'); }
+async function setLoggedInUser(user) {
+  const { data } = await supabaseClient.from('profiles').select('username').eq('id', user.id).maybeSingle();
+  document.querySelector('.account-button small').textContent = data?.username || user.user_metadata?.username || 'Cuenta';
+  mustSignIn = false; usernameModal.classList.remove('open'); document.querySelector('.overlay').classList.remove('open');
+}
+usernameInput.addEventListener('input', updateUsernameStatus);
+emailInput.addEventListener('input', updateSubmitButton); passwordInput.addEventListener('input', updateSubmitButton);
+document.querySelectorAll('[data-auth-mode]').forEach(button => button.onclick = () => setAuthMode(button.dataset.authMode));
+saveUsername.onclick = async () => {
+  if (saveUsername.disabled || !supabaseClient) return;
+  saveUsername.disabled = true; setAuthMessage('Procesando…');
+  const email = emailInput.value.trim(); const password = passwordInput.value;
+  if (authMode === 'register') {
+    const username = usernameInput.value.trim().toLowerCase();
+    const { data, error } = await supabaseClient.auth.signUp({ email, password, options: { data: { username }, emailRedirectTo: window.location.href } });
+    if (error) { setAuthMessage(error.message, 'error'); updateSubmitButton(); return; }
+    if (data.session) { await setLoggedInUser(data.user); return; }
+    setAuthMode('login'); setAuthMessage('Revisa tu correo y confirma tu cuenta antes de iniciar sesión.', 'success');
+  } else {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) { setAuthMessage('Correo o contraseña incorrectos.', 'error'); updateSubmitButton(); return; }
+    await setLoggedInUser(data.user);
+  }
+};
+document.querySelector('.account-button').onclick = () => openAuthModal(false);
+document.querySelector('.close-account').onclick = closeAuthModal;
+document.querySelector('.overlay').onclick = () => { document.querySelector('.cart-panel').classList.remove('open'); document.querySelector('.preset-modal').classList.remove('open'); closeAuthModal(); if (!mustSignIn) document.querySelector('.overlay').classList.remove('open'); };
+if (supabaseClient) { supabaseClient.auth.getSession().then(({ data: { session } }) => session ? setLoggedInUser(session.user) : openAuthModal(true)); } else { openAuthModal(true); }
