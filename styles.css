@@ -4,8 +4,10 @@ html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--cream);font-family:Manrope,Arial,sans-serif;font-size:14px}
 .noise{position:fixed;inset:0;z-index:-1;opacity:.035;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 .site-header{height:80px;padding:0 6vw;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);position:relative;z-index:5;background:#0d0d0de8;backdrop-filter:blur(12px)}
-.brand{font-family:'Barlow Condensed';font-size:25px;font-weight:700;letter-spacing:1.5px;color:var(--cream);text-decoration:none}
-.brand span{color:var(--gold)}
+.brand{font-family:'Barlow Condensed';font-size:25px;font-weight:700;letter-spacing:1.5px;color:var(--cream);text-decoration:none;display:flex;align-items:center;gap:9px}
+.brand>span:not(.brand-name),.brand-name span{color:var(--gold)}
+.brand-logo{width:46px;height:46px;object-fit:contain}
+.brand-name{white-space:nowrap;color:var(--cream)}
 .nav{display:flex;gap:27px}
 .nav a,footer a{color:#c6c0b7;text-decoration:none;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px}
 .nav a:hover,footer a:hover,.text-link:hover{color:var(--gold)}
@@ -386,6 +388,13 @@ footer div{gap:12px}
 .profile-order.is-action{background:transparent;color:var(--cream);border:0;border-bottom:1px solid #55452d;text-align:left;cursor:pointer;font:inherit;margin:0 -6px;padding:12px 6px;transition:background .2s,border-color .2s}
 .profile-order.is-action:hover,.profile-order.is-action:focus-visible{background:#251f15;border-color:var(--gold);outline:none}
 .profile-order.is-action small{color:var(--gold);font-weight:800;text-transform:uppercase;letter-spacing:.6px}
+.profile-order.is-pending{padding-bottom:13px}
+.profile-order-actions{grid-column:1/-1;display:flex;gap:8px;margin-top:6px}
+.profile-order-action{border:1px solid #55452d;background:transparent;color:#d7c5a8;padding:8px 10px;cursor:pointer;font:800 8px Manrope;letter-spacing:.65px;text-transform:uppercase}
+.profile-order-action.continue{border-color:#866737;color:var(--gold)}
+.profile-order-action:hover{background:#251f15}
+.profile-order-action.cancel{color:#c78d7f;border-color:#6a4038}
+.profile-order-action.cancel:hover{background:#2b1715}
 
 @media(max-width:650px){.checkout-modal{width:94vw;max-height:92vh;padding:29px 20px}
 .checkout-head h2,.bank-content h2,.checkout-finish h2{font-size:45px}

@@ -235,7 +235,14 @@ async function cancelPendingOrder(orderId) {
   if (!confirmed) return;
   const { error } = await supabaseClient.rpc('cancel_store_order', { p_order_id: orderId });
   if (error) {
-    window.alert('No fue posible cancelar el pedido. Si ya realizaste el pago, contáctanos por soporte.');
+    const detail = String(error.message || '').toLowerCase();
+    if (detail.includes('cancel_store_order') || detail.includes('does not exist') || detail.includes('schema cache')) {
+      window.alert('La opción de cancelar aún necesita activarse en Supabase. Ejecuta el archivo supabase-cancel-orders-setup.sql en el SQL Editor y vuelve a intentarlo.');
+    } else if (detail.includes('ya no puede cancelarse')) {
+      window.alert('Este pedido ya no puede cancelarse desde la página. Si realizaste el pago o enviaste comprobante, contáctanos por soporte.');
+    } else {
+      window.alert('No fue posible cancelar el pedido. Intenta de nuevo en un momento.');
+    }
     return;
   }
   await refreshProfileOrders();
