@@ -217,8 +217,8 @@ begin
   -- Si un clic se reintenta por conexión lenta, devuelve el mismo pedido.
   if p_checkout_token is not null then
     select * into v_order
-    from public.orders
-    where user_id = v_user_id and checkout_token = p_checkout_token;
+    from public.orders as existing_order
+    where existing_order.user_id = v_user_id and existing_order.checkout_token = p_checkout_token;
     if found then
       return query select v_order.id, v_order.order_code, v_order.total_mxn, v_order.status;
       return;
@@ -265,8 +265,8 @@ begin
   from requested r
   join public.store_products p on p.id = r.product_id and p.active = true;
 
-  select email into v_email from auth.users where id = v_user_id;
-  select username into v_name from public.profiles where id = v_user_id;
+  select user_record.email into v_email from auth.users as user_record where user_record.id = v_user_id;
+  select profile_record.username into v_name from public.profiles as profile_record where profile_record.id = v_user_id;
   v_name := coalesce(v_name, split_part(coalesce(v_email, 'cliente'), '@', 1));
 
   insert into public.orders (
@@ -311,14 +311,14 @@ begin
     raise exception 'La ruta del comprobante no es válida.' using errcode = '22023';
   end if;
 
-  update public.orders
+  update public.orders as target_order
   set receipt_path = p_receipt_path,
       status = 'pending_validation',
       updated_at = now()
-  where id = p_order_id
-    and user_id = v_user_id
-    and payment_method = 'bank_transfer'
-    and status = 'pending_payment'
+  where target_order.id = p_order_id
+    and target_order.user_id = v_user_id
+    and target_order.payment_method = 'bank_transfer'
+    and target_order.status = 'pending_payment'
   returning * into v_order;
 
   if not found then
