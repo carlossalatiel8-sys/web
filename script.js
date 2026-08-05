@@ -126,6 +126,7 @@ const usernameStatus = document.querySelector('#username-status');
 const saveUsername = document.querySelector('#save-username');
 const usernameModal = document.querySelector('.account-modal');
 const emailInput = document.querySelector('#email-input');
+const authIdentifierLabel = document.querySelector('#auth-identifier-label');
 const passwordInput = document.querySelector('#password-input');
 const authStatus = document.querySelector('#auth-status');
 const usernameField = document.querySelector('.username-field');
@@ -156,12 +157,13 @@ function translateAuthError(error) {
   return 'No fue posible crear la cuenta. Revisa tus datos e inténtalo nuevamente.';
 }
 function validEmail() { return /^\S+@\S+\.\S+$/.test(emailInput.value.trim()); }
+function validLoginIdentifier() { return validEmail() || /^[a-zA-Z0-9_-]{3,20}$/.test(emailInput.value.trim()); }
 function validPassword() { return passwordInput.value.length >= 8; }
 function updateSubmitButton() {
   const passwordsMatch = authMode === 'login' || (confirmPasswordInput.value.length > 0 && passwordInput.value === confirmPasswordInput.value);
   if (authMode === 'register' && confirmPasswordInput.value.length > 0 && !passwordsMatch) setAuthMessage('Las contraseñas no coinciden.', 'error');
   if (authMode === 'register' && passwordsMatch && authStatus.textContent === 'Las contraseñas no coinciden.') setAuthMessage();
-  const ready = isConfigured && validEmail() && validPassword() && passwordsMatch && (authMode === 'login' || usernameAvailable);
+  const ready = isConfigured && (authMode === 'login' ? validLoginIdentifier() : validEmail()) && validPassword() && passwordsMatch && (authMode === 'login' || usernameAvailable);
   saveUsername.disabled = !ready;
 }
 async function updateUsernameStatus() {
@@ -184,7 +186,11 @@ function setAuthMode(mode) {
   usernameField.style.display = registering ? '' : 'none'; usernameStatus.style.display = registering ? '' : 'none';
   confirmPasswordField.style.display = registering ? '' : 'none';
   document.querySelector('#auth-title').innerHTML = registering ? 'Crea tu<br /><em>cuenta.</em>' : 'Inicia<br /><em>sesión.</em>';
-  document.querySelector('#auth-intro').textContent = registering ? 'Tu contraseña es solo para KAY GUITAR; no tiene que ser la de tu correo.' : 'Usa el correo y la contraseña con los que creaste tu cuenta KAY GUITAR.';
+  document.querySelector('#auth-intro').textContent = registering ? 'Tu contraseña es solo para KAY GUITAR; no tiene que ser la de tu correo.' : 'Usa tu correo o nombre de usuario junto con la contraseña de tu cuenta KAY GUITAR.';
+  authIdentifierLabel.textContent = registering ? 'Correo electrónico' : 'Correo o nombre de usuario';
+  emailInput.type = registering ? 'email' : 'text';
+  emailInput.autocomplete = registering ? 'email' : 'username';
+  emailInput.placeholder = registering ? 'tu@correo.com' : 'tu@correo.com o guitarrista_01';
   saveUsername.innerHTML = registering ? 'Crear cuenta <i>→</i>' : 'Entrar <i>→</i>'; passwordInput.autocomplete = registering ? 'new-password' : 'current-password'; setAuthMessage(); updateSubmitButton();
 }
 function openAuthModal(required) { mustSignIn = required; usernameModal.classList.add('open'); document.querySelector('.overlay').classList.add('open'); document.querySelector('.close-account').style.display = required ? 'none' : ''; if (!isConfigured) setAuthMessage('La conexión de cuentas necesita configurarse antes de usarse.', 'error'); setTimeout(() => emailInput.focus(), 100); }
@@ -247,8 +253,25 @@ saveUsername.onclick = async () => {
     setAuthMode('login');
     setAuthMessage('¡Cuenta creada! Te enviamos un correo para verificarla. Revisa tu bandeja de entrada; si no aparece, busca también en Spam un correo de “Supabase Auth”. Después de verificarlo podrás iniciar sesión.', 'success');
   } else {
-    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-    if (error) { setAuthMessage('Correo o contraseña incorrectos.', 'error'); updateSubmitButton(); return; }
+    const identifier = email;
+    let data;
+    let error;
+    if (validEmail()) {
+      ({ data, error } = await supabaseClient.auth.signInWithPassword({ email: identifier, password }));
+    } else {
+      const login = await supabaseClient.functions.invoke('username-login', {
+        body: { username: identifier.toLowerCase(), password }
+      });
+      if (login.error || !login.data?.session?.access_token || !login.data?.session?.refresh_token) {
+        error = login.error || new Error('Credenciales incorrectas.');
+      } else {
+        ({ data, error } = await supabaseClient.auth.setSession({
+          access_token: login.data.session.access_token,
+          refresh_token: login.data.session.refresh_token
+        }));
+      }
+    }
+    if (error || !data?.user) { setAuthMessage('Correo o nombre de usuario, o contraseña incorrectos.', 'error'); updateSubmitButton(); return; }
     await setLoggedInUser(data.user);
   }
 };
