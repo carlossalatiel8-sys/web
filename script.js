@@ -153,4 +153,4 @@ saveUsername.onclick = async () => {
 document.querySelector('.account-button').onclick = () => openAuthModal(false);
 document.querySelector('.close-account').onclick = closeAuthModal;
 document.querySelector('.overlay').onclick = () => { document.querySelector('.cart-panel').classList.remove('open'); document.querySelector('.preset-modal').classList.remove('open'); closeAuthModal(); if (!mustSignIn) document.querySelector('.overlay').classList.remove('open'); };
-if (supabaseClient) { supabaseClient.auth.getSession().then(({ data: { session } }) => session ? setLoggedInUser(session.user) : openAuthModal(true)); } else { openAuthModal(true); }
+if (supabaseClient) { supabaseClient.auth.getSession().then(({ data: { session } }) => session ? setLoggedInUser(session.user) : openAuthModal(false)); } else { openAuthModal(false); }
