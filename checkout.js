@@ -25,7 +25,16 @@
   let paypalSdkPromise = null;
 
   const mxn = (value) => `$${Number(value || 0).toLocaleString('es-MX')} MXN`;
-  const makeToken = () => window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  function makeToken() {
+    if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+    const bytes = new Uint8Array(16);
+    if (window.crypto?.getRandomValues) window.crypto.getRandomValues(bytes);
+    else for (let index = 0; index < bytes.length; index += 1) bytes[index] = Math.floor(Math.random() * 256);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
 
   function cartLines() {
     const compacted = new Map();
@@ -211,7 +220,11 @@
     const value = String(error?.message || error || '').toLowerCase();
     if (value.includes('session') || value.includes('jwt') || value.includes('iniciar sesión')) return 'Tu sesión terminó. Inicia sesión de nuevo para continuar.';
     if (value.includes('disponible')) return 'Uno de los productos ya no está disponible. Revisa tu carrito.';
-    return fallback;
+    if (value.includes('uuid') || value.includes('input syntax')) return 'No se pudo preparar el código seguro del pedido. Recarga la página e inténtalo de nuevo.';
+    if (value.includes('create_store_order') || value.includes('schema cache') || value.includes('function')) return 'La configuración de pedidos de la tienda necesita activarse en Supabase. Ejecuta el archivo supabase-orders-setup.sql y vuelve a intentar.';
+    if (value.includes('ambiguous')) return 'La configuración de pedidos necesita actualizarse en Supabase. Ejecuta de nuevo el archivo supabase-orders-setup.sql.';
+    const code = String(error?.code || 'sin-código').slice(0, 32);
+    return `${fallback} Código de revisión: ${code}.`;
   }
 
   async function startBankTransfer() {
