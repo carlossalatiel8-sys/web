@@ -86,6 +86,12 @@ const emailInput = document.querySelector('#email-input');
 const passwordInput = document.querySelector('#password-input');
 const authStatus = document.querySelector('#auth-status');
 const usernameField = document.querySelector('.username-field');
+const passwordLabel = passwordInput.closest('label');
+passwordLabel.classList.add('password-label');
+passwordInput.insertAdjacentHTML('afterend', '<button type="button" class="password-toggle" data-target="password-input" aria-label="Mostrar contraseña"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.7"/></svg></button>');
+passwordLabel.insertAdjacentHTML('afterend', '<label class="confirm-password-field password-label">Confirma tu contraseña<input id="confirm-password-input" type="password" autocomplete="new-password" minlength="8" placeholder="Vuelve a escribir tu contraseña" /><button type="button" class="password-toggle" data-target="confirm-password-input" aria-label="Mostrar contraseña"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.7"/></svg></button></label>');
+const confirmPasswordInput = document.querySelector('#confirm-password-input');
+const confirmPasswordField = document.querySelector('.confirm-password-field');
 const reservedNames = ['admin', 'administrador', 'support', 'soporte', 'kayguitar', 'kayu'];
 const supabaseSettings = window.KAY_GUITAR_SUPABASE || {};
 const isConfigured = supabaseSettings.url && supabaseSettings.anonKey && !supabaseSettings.url.startsWith('PEGA_') && !supabaseSettings.anonKey.startsWith('PEGA_');
@@ -107,7 +113,10 @@ function translateAuthError(error) {
 function validEmail() { return /^\S+@\S+\.\S+$/.test(emailInput.value.trim()); }
 function validPassword() { return passwordInput.value.length >= 8; }
 function updateSubmitButton() {
-  const ready = isConfigured && validEmail() && validPassword() && (authMode === 'login' || usernameAvailable);
+  const passwordsMatch = authMode === 'login' || (confirmPasswordInput.value.length > 0 && passwordInput.value === confirmPasswordInput.value);
+  if (authMode === 'register' && confirmPasswordInput.value.length > 0 && !passwordsMatch) setAuthMessage('Las contraseñas no coinciden.', 'error');
+  if (authMode === 'register' && passwordsMatch && authStatus.textContent === 'Las contraseñas no coinciden.') setAuthMessage();
+  const ready = isConfigured && validEmail() && validPassword() && passwordsMatch && (authMode === 'login' || usernameAvailable);
   saveUsername.disabled = !ready;
 }
 async function updateUsernameStatus() {
@@ -128,6 +137,7 @@ function setAuthMode(mode) {
   authMode = mode; const registering = mode === 'register';
   document.querySelectorAll('[data-auth-mode]').forEach(button => button.classList.toggle('active', button.dataset.authMode === mode));
   usernameField.style.display = registering ? '' : 'none'; usernameStatus.style.display = registering ? '' : 'none';
+  confirmPasswordField.style.display = registering ? '' : 'none';
   document.querySelector('#auth-title').innerHTML = registering ? 'Crea tu<br /><em>cuenta.</em>' : 'Inicia<br /><em>sesión.</em>';
   document.querySelector('#auth-intro').textContent = registering ? 'Tu contraseña es solo para KAY GUITAR; no tiene que ser la de tu correo.' : 'Usa el correo y la contraseña con los que creaste tu cuenta KAY GUITAR.';
   saveUsername.innerHTML = registering ? 'Crear cuenta <i>→</i>' : 'Entrar <i>→</i>'; passwordInput.autocomplete = registering ? 'new-password' : 'current-password'; setAuthMessage(); updateSubmitButton();
@@ -142,7 +152,8 @@ async function setLoggedInUser(user) {
   mustSignIn = false; usernameModal.classList.remove('open'); document.querySelector('.overlay').classList.remove('open');
 }
 usernameInput.addEventListener('input', updateUsernameStatus);
-emailInput.addEventListener('input', updateSubmitButton); passwordInput.addEventListener('input', updateSubmitButton);
+emailInput.addEventListener('input', updateSubmitButton); passwordInput.addEventListener('input', updateSubmitButton); confirmPasswordInput.addEventListener('input', updateSubmitButton);
+document.querySelectorAll('.password-toggle').forEach(button => button.onclick = () => { const input = document.querySelector(`#${button.dataset.target}`); const revealing = input.type === 'password'; input.type = revealing ? 'text' : 'password'; button.classList.toggle('showing', revealing); button.setAttribute('aria-label', revealing ? 'Ocultar contraseña' : 'Mostrar contraseña'); });
 document.querySelectorAll('[data-auth-mode]').forEach(button => button.onclick = () => setAuthMode(button.dataset.authMode));
 saveUsername.onclick = async () => {
   if (saveUsername.disabled || !supabaseClient) return;
