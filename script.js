@@ -206,15 +206,21 @@ async function refreshProfileOrders() {
   const render = (orders, emptyTitle, emptyCopy, icon, pendingOrders = false) => orders.length
     ? orders.map(order => {
       const canContinue = pendingOrders && order.payment_method === 'bank_transfer' && order.status === 'pending_payment';
-      const action = canContinue ? '<small>Continuar y subir comprobante →</small>' : `<small>$${order.total_mxn} MXN</small>`;
-      const tag = canContinue ? 'button' : 'div';
-      const attributes = canContinue ? ` type="button" data-resume-order="${order.id}" aria-label="Continuar pedido ${order.order_code}"` : '';
-      return `<${tag} class="profile-order${canContinue ? ' is-action' : ''}"${attributes}><b>${order.order_code}</b><span>${orderStatusLabel(order.status)}</span>${action}</${tag}>`;
+      const canCancel = pendingOrders && order.status === 'pending_payment';
+      if (canContinue || canCancel) {
+        return `<div class="profile-order is-pending"><b>${order.order_code}</b><span>${orderStatusLabel(order.status)}</span><small>$${order.total_mxn} MXN</small><div class="profile-order-actions">${canContinue ? `<button type="button" class="profile-order-action continue" data-resume-order="${order.id}">Continuar pedido →</button>` : ''}<button type="button" class="profile-order-action cancel" data-cancel-order="${order.id}">Cancelar pedido</button></div></div>`;
+      }
+      return `<div class="profile-order"><b>${order.order_code}</b><span>${orderStatusLabel(order.status)}</span><small>$${order.total_mxn} MXN</small></div>`;
     }).join('')
     : `<span>${icon}</span><b>${emptyTitle}</b><small>${emptyCopy}</small>`;
   history.innerHTML = render(paid, 'Aún no tienes compras registradas.', 'Tus presets aparecerán aquí cuando se confirme tu pago.', '◌');
   pending.innerHTML = render(open, 'No tienes pedidos pendientes.', 'Cuando solicites un preset, podrás seguirlo desde aquí.', '◷', true);
   pending.onclick = (event) => {
+    const cancelButton = event.target.closest('[data-cancel-order]');
+    if (cancelButton) {
+      cancelPendingOrder(cancelButton.dataset.cancelOrder);
+      return;
+    }
     const button = event.target.closest('[data-resume-order]');
     if (!button) return;
     const selectedOrder = open.find(order => order.id === button.dataset.resumeOrder);
@@ -222,6 +228,18 @@ async function refreshProfileOrders() {
     closeProfileModal();
     window.KayGuitarCheckout?.resumeBankTransfer(selectedOrder);
   };
+}
+async function cancelPendingOrder(orderId) {
+  if (!supabaseClient || !orderId) return;
+  const confirmed = window.confirm('¿Deseas cancelar este pedido? Esta acción no se puede deshacer.');
+  if (!confirmed) return;
+  const { error } = await supabaseClient.rpc('cancel_store_order', { p_order_id: orderId });
+  if (error) {
+    window.alert('No fue posible cancelar el pedido. Si ya realizaste el pago, contáctanos por soporte.');
+    return;
+  }
+  await refreshProfileOrders();
+  window.alert('Tu pedido fue cancelado.');
 }
 async function setLoggedInUser(user) {
   const { data } = await supabaseClient.from('profiles').select('username').eq('id', user.id).maybeSingle();
