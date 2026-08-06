@@ -254,6 +254,8 @@ async function setLoggedInUser(user) {
   currentProfileName = username;
   document.querySelector('.account-button small').textContent = username;
   document.querySelector('#profile-username').textContent = username; document.querySelector('#profile-email').textContent = user.email || '';
+  const adminOrdersLink = document.querySelector('#admin-orders-link');
+  if (adminOrdersLink) adminOrdersLink.hidden = user.app_metadata?.role !== 'admin';
   mustSignIn = false; usernameModal.classList.remove('open'); document.querySelector('.overlay').classList.remove('open');
   refreshProfileOrders();
   document.dispatchEvent(new CustomEvent('kayguitar:authenticated'));
