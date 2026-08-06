@@ -35,6 +35,14 @@
         <div class="admin-orders" id="admin-orders"></div>
       </section>
     </main>
+    <section class="receipt-modal" id="receipt-modal" hidden aria-label="Comprobante de pago">
+      <div class="receipt-modal-card">
+        <button class="receipt-close" id="receipt-close" type="button" aria-label="Cerrar comprobante">×</button>
+        <p class="eyebrow"><span></span> COMPROBANTE DE PAGO</p>
+        <h2 id="receipt-title">Pedido</h2>
+        <div class="receipt-preview" id="receipt-preview"></div>
+      </div>
+    </section>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js"></script>
     <script src="admin.js"></script>

@@ -6,6 +6,9 @@
   const content = $('#admin-content');
   const ordersContainer = $('#admin-orders');
   const accountStatus = $('#admin-account-status');
+  const receiptModal = $('#receipt-modal');
+  const receiptPreview = $('#receipt-preview');
+  const receiptTitle = $('#receipt-title');
   const labels = { pending_payment: 'Pendiente de pago', pending_validation: 'Pendiente de validación', payment_approved: 'Pago aprobado', payment_rejected: 'Pago rechazado', cancelled: 'Cancelado', delivered: 'Entregado' };
 
   function escapeHtml(value) {
@@ -21,13 +24,14 @@
     ordersContainer.innerHTML = visible.map((order) => {
       const delivery = canDeliver(order) ? `<div class="admin-delivery"><input class="admin-drive-input" type="url" placeholder="Pega aquí el enlace de Google Drive" aria-label="Enlace de Drive para ${escapeHtml(order.order_code)}" /><button class="button gold admin-deliver" type="button" data-order-id="${escapeHtml(order.id)}">Enviar y marcar entregado</button></div>` : '';
       const savedLink = Array.isArray(order.download_links) && order.download_links[0]?.url ? `<div class="admin-order-details"><div>Enlace enviado<b><a class="admin-back" target="_blank" rel="noreferrer" href="${escapeHtml(order.download_links[0].url)}">Abrir Drive ↗</a></b></div></div>` : '';
-      return `<article class="admin-order"><div class="admin-order-top"><div><b class="admin-order-code">${escapeHtml(order.order_code || 'SIN CÓDIGO')}</b><h2 class="admin-order-name">${escapeHtml(order.customer_name)}</h2><p class="admin-order-email">${escapeHtml(order.customer_email)}</p></div><span class="admin-order-state">${escapeHtml(labels[order.status] || order.status)}</span></div><div class="admin-order-details"><div>Productos<b>${escapeHtml(productsText(order.items))}</b></div><div>Total<b>$${escapeHtml(order.total_mxn)} MXN</b></div><div>Fecha<b>${new Date(order.created_at).toLocaleString('es-MX')}</b></div></div>${delivery}${savedLink}</article>`;
+      const receiptButton = order.receipt_path ? `<button class="admin-secondary admin-view-receipt" type="button" data-order-id="${escapeHtml(order.id)}" data-order-code="${escapeHtml(order.order_code)}">Ver comprobante</button>` : '';
+      return `<article class="admin-order"><div class="admin-order-top"><div><b class="admin-order-code">${escapeHtml(order.order_code || 'SIN CÓDIGO')}</b><h2 class="admin-order-name">${escapeHtml(order.customer_name)}</h2><p class="admin-order-email">${escapeHtml(order.customer_email)}</p></div><span class="admin-order-state">${escapeHtml(labels[order.status] || order.status)}</span></div><div class="admin-order-details"><div>Productos<b>${escapeHtml(productsText(order.items))}</b></div><div>Total<b>$${escapeHtml(order.total_mxn)} MXN</b></div><div>Fecha<b>${new Date(order.created_at).toLocaleString('es-MX')}</b></div></div>${delivery}<div class="admin-order-actions">${receiptButton}<button class="admin-delete admin-delete-order" type="button" data-order-id="${escapeHtml(order.id)}" data-order-code="${escapeHtml(order.order_code)}">Eliminar pedido</button></div>${savedLink}</article>`;
     }).join('');
   }
 
   async function loadOrders() {
     setMessage('Actualizando pedidos…');
-    const { data, error } = await state.client.from('orders').select('id, order_code, customer_name, customer_email, items, total_mxn, status, created_at, download_links').order('created_at', { ascending: false });
+    const { data, error } = await state.client.from('orders').select('id, order_code, customer_name, customer_email, items, total_mxn, status, created_at, download_links, receipt_path').order('created_at', { ascending: false });
     if (error) { setMessage('No fue posible cargar los pedidos. Vuelve a iniciar sesión e intenta de nuevo.', 'error'); return; }
     state.orders = data || []; setMessage(`${state.orders.length} pedido(s) encontrado(s).`, 'success'); render();
   }
@@ -44,6 +48,37 @@
     setMessage(`Listo: ${data.order_code} fue enviado por correo y marcado como entregado.`, 'success'); await loadOrders();
   }
 
+  async function getOrderTool(body) {
+    const { data, error } = await state.client.functions.invoke('admin-order-tools', { body });
+    if (error || !data?.ok) throw new Error(data?.error || error?.message || 'Intenta de nuevo.');
+    return data;
+  }
+
+  async function viewReceipt(button) {
+    setMessage('Abriendo comprobante…');
+    try {
+      const data = await getOrderTool({ action: 'receipt', order_id: button.dataset.orderId });
+      receiptTitle.textContent = `Pedido ${button.dataset.orderCode}`;
+      receiptPreview.innerHTML = data.mime_type?.startsWith('image/')
+        ? `<img src="${escapeHtml(data.signed_url)}" alt="Comprobante ${escapeHtml(button.dataset.orderCode)}" />`
+        : `<iframe src="${escapeHtml(data.signed_url)}" title="Comprobante ${escapeHtml(button.dataset.orderCode)}"></iframe>`;
+      receiptModal.hidden = false;
+      setMessage('');
+    } catch (error) { setMessage(`No fue posible abrir el comprobante. ${error.message}`, 'error'); }
+  }
+
+  async function deleteOrder(button) {
+    const orderCode = button.dataset.orderCode;
+    const typedCode = window.prompt(`Esta acción elimina permanentemente el pedido y su comprobante. Para confirmar, escribe exactamente ${orderCode}`);
+    if (typedCode !== orderCode) { if (typedCode !== null) setMessage('El código no coincide. El pedido no se eliminó.', 'error'); return; }
+    button.disabled = true; button.textContent = 'Eliminando…'; setMessage('Eliminando pedido…');
+    try {
+      await getOrderTool({ action: 'delete', order_id: button.dataset.orderId, confirm_order_code: orderCode });
+      setMessage(`${orderCode} fue eliminado.`, 'success');
+      await loadOrders();
+    } catch (error) { setMessage(`No fue posible eliminar el pedido. ${error.message}`, 'error'); button.disabled = false; button.textContent = 'Eliminar pedido'; }
+  }
+
   async function start() {
     if (!config?.url || !config?.anonKey || !window.supabase) { accountStatus.textContent = 'Falta la configuración de la tienda.'; return; }
     state.client = window.supabase.createClient(config.url, config.anonKey);
@@ -56,8 +91,12 @@
     const filter = event.target.closest('.admin-filter');
     if (filter) { state.filter = filter.dataset.filter; document.querySelectorAll('.admin-filter').forEach((item) => item.classList.toggle('active', item === filter)); render(); }
     const deliverButton = event.target.closest('.admin-deliver'); if (deliverButton) deliver(deliverButton);
+    const receiptButton = event.target.closest('.admin-view-receipt'); if (receiptButton) viewReceipt(receiptButton);
+    const deleteButton = event.target.closest('.admin-delete-order'); if (deleteButton) deleteOrder(deleteButton);
   });
   $('#admin-refresh').addEventListener('click', loadOrders);
+  $('#receipt-close').addEventListener('click', () => { receiptModal.hidden = true; receiptPreview.innerHTML = ''; });
+  receiptModal.addEventListener('click', (event) => { if (event.target === receiptModal) { receiptModal.hidden = true; receiptPreview.innerHTML = ''; } });
   $('#admin-logout').addEventListener('click', async () => {
     if (state.client) await state.client.auth.signOut();
     window.location.href = 'index.html';
