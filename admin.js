@@ -22,8 +22,8 @@
     const visible = state.filter === 'all' ? state.orders : state.orders.filter((order) => order.status === state.filter);
     if (!visible.length) { ordersContainer.innerHTML = '<div class="admin-empty">No hay pedidos en este filtro.</div>'; return; }
     ordersContainer.innerHTML = visible.map((order) => {
-      const delivery = canDeliver(order) ? `<div class="admin-delivery"><input class="admin-drive-input" type="url" placeholder="Pega aquí el enlace de Google Drive" aria-label="Enlace de Drive para ${escapeHtml(order.order_code)}" /><button class="button gold admin-deliver" type="button" data-order-id="${escapeHtml(order.id)}">Enviar y marcar entregado</button></div>` : '';
-      const savedLink = Array.isArray(order.download_links) && order.download_links[0]?.url ? `<div class="admin-order-details"><div>Enlace enviado<b><a class="admin-back" target="_blank" rel="noreferrer" href="${escapeHtml(order.download_links[0].url)}">Abrir Drive ↗</a></b></div></div>` : '';
+      const delivery = canDeliver(order) ? `<div class="admin-delivery"><div class="admin-links"><input class="admin-drive-input" type="url" placeholder="Pega aquí el enlace de Google Drive" aria-label="Enlace de Drive para ${escapeHtml(order.order_code)}" /><button class="admin-add-link" type="button">+ Añadir otro enlace</button></div><button class="button gold admin-deliver" type="button" data-order-id="${escapeHtml(order.id)}">Enviar y marcar entregado</button></div>` : '';
+      const savedLink = Array.isArray(order.download_links) && order.download_links[0]?.url ? `<div class="admin-order-details"><div>Enlaces enviados<b>${order.download_links.map((link, index) => `<a class="admin-back admin-saved-link" target="_blank" rel="noreferrer" href="${escapeHtml(link.url)}">Abrir enlace ${index + 1} ↗</a>`).join('')}</b></div></div>` : '';
       const receiptButton = order.receipt_path ? `<button class="admin-secondary admin-view-receipt" type="button" data-order-id="${escapeHtml(order.id)}" data-order-code="${escapeHtml(order.order_code)}">Ver comprobante</button>` : '';
       return `<article class="admin-order"><div class="admin-order-top"><div><b class="admin-order-code">${escapeHtml(order.order_code || 'SIN CÓDIGO')}</b><h2 class="admin-order-name">${escapeHtml(order.customer_name)}</h2><p class="admin-order-email">${escapeHtml(order.customer_email)}</p></div><span class="admin-order-state">${escapeHtml(labels[order.status] || order.status)}</span></div><div class="admin-order-details"><div>Productos<b>${escapeHtml(productsText(order.items))}</b></div><div>Total<b>$${escapeHtml(order.total_mxn)} MXN</b></div><div>Fecha<b>${new Date(order.created_at).toLocaleString('es-MX')}</b></div></div>${delivery}<div class="admin-order-actions">${receiptButton}<button class="admin-delete admin-delete-order" type="button" data-order-id="${escapeHtml(order.id)}" data-order-code="${escapeHtml(order.order_code)}">Eliminar pedido</button></div>${savedLink}</article>`;
     }).join('');
@@ -38,12 +38,12 @@
 
   async function deliver(button) {
     const card = button.closest('.admin-order');
-    const input = card.querySelector('.admin-drive-input');
-    const downloadUrl = input.value.trim();
-    if (!downloadUrl) { setMessage('Pega primero el enlace de Google Drive.', 'error'); input.focus(); return; }
+    const inputs = [...card.querySelectorAll('.admin-drive-input')];
+    const downloadUrls = inputs.map((input) => input.value.trim()).filter(Boolean);
+    if (!downloadUrls.length) { setMessage('Pega primero al menos un enlace de Google Drive.', 'error'); inputs[0].focus(); return; }
     if (!window.confirm('¿Enviar el correo de entrega y marcar este pedido como entregado?')) return;
     button.disabled = true; button.textContent = 'Enviando…'; setMessage('Enviando correo y actualizando pedido…');
-    const { data, error } = await state.client.functions.invoke('deliver-order', { body: { order_id: button.dataset.orderId, download_url: downloadUrl } });
+    const { data, error } = await state.client.functions.invoke('deliver-order', { body: { order_id: button.dataset.orderId, download_urls: downloadUrls } });
     if (error || !data?.ok) { const detail = data?.error || error?.message || 'Intenta de nuevo.'; setMessage(`No se pudo entregar el pedido. ${detail}`, 'error'); button.disabled = false; button.textContent = 'Enviar y marcar entregado'; return; }
     setMessage(`Listo: ${data.order_code} fue enviado por correo y marcado como entregado.`, 'success'); await loadOrders();
   }
@@ -91,6 +91,13 @@
     const filter = event.target.closest('.admin-filter');
     if (filter) { state.filter = filter.dataset.filter; document.querySelectorAll('.admin-filter').forEach((item) => item.classList.toggle('active', item === filter)); render(); }
     const deliverButton = event.target.closest('.admin-deliver'); if (deliverButton) deliver(deliverButton);
+    const addLinkButton = event.target.closest('.admin-add-link');
+    if (addLinkButton) {
+      const links = addLinkButton.closest('.admin-links');
+      const input = document.createElement('input');
+      input.className = 'admin-drive-input'; input.type = 'url'; input.placeholder = 'Otro enlace de Google Drive'; input.setAttribute('aria-label', 'Otro enlace de Google Drive');
+      links.insertBefore(input, addLinkButton); input.focus();
+    }
     const receiptButton = event.target.closest('.admin-view-receipt'); if (receiptButton) viewReceipt(receiptButton);
     const deleteButton = event.target.closest('.admin-delete-order'); if (deleteButton) deleteOrder(deleteButton);
   });
