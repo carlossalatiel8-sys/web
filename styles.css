@@ -460,3 +460,74 @@ body.profile-modal-open{overflow:hidden;touch-action:none}
 html{touch-action:manipulation}
 input,select,textarea{font-size:16px!important}
 }
+
+/* Apariencia clara: conserva el dorado de KAY GUITAR como acento y mejora la
+   lectura sin alterar imágenes, compras ni datos de cuenta. */
+.theme-button{min-width:42px;padding:0 3px}
+.theme-symbol{font-size:18px;line-height:1}
+
+html.theme-light{color-scheme:light;--bg:#f6f3ee;--soft:#fffdf9;--line:#d9d2c8;--gold:#9c6b27;--cream:#1d1a16;--muted:#6b645b}
+html.theme-light body{background:#f6f3ee;color:#1d1a16}
+html.theme-light .noise{opacity:.02;mix-blend-mode:multiply}
+html.theme-light .site-header{background:#fbfaf6eF;border-color:#d9d2c8}
+html.theme-light .nav a,html.theme-light footer a{color:#514b43}
+html.theme-light .nav a:hover,html.theme-light footer a:hover,html.theme-light .text-link:hover{color:var(--gold)}
+html.theme-light .icon-button,html.theme-light .cart-button,html.theme-light .menu-button,html.theme-light .outline,html.theme-light .text-link,html.theme-light .add-button{color:#28231d}
+html.theme-light .cart-button{border-color:#cfc6b9}
+html.theme-light .hero-text,html.theme-light .section-heading>p,html.theme-light .custom-copy>p:not(.eyebrow),html.theme-light .lesson-copy>p:not(.eyebrow),html.theme-light .about p,html.theme-light .support p,html.theme-light .suggestions>div>p:not(.eyebrow){color:#625b52}
+html.theme-light .hero-stats div,html.theme-light .lesson-details div,html.theme-light .support>div,html.theme-light .support details{border-color:#d7d0c6}
+html.theme-light .hero-stats span,html.theme-light .strip p,html.theme-light .strip span,html.theme-light .price small,html.theme-light .lesson-details span,html.theme-light footer p{color:#70685e}
+html.theme-light .strip b,html.theme-light .lesson-details strong{color:#29241e}
+html.theme-light .product{background:#fffdf9;border-color:#ddd5ca}
+html.theme-light .product:hover{border-color:#af8748}
+html.theme-light .product-bottom,html.theme-light .demo-button{border-color:#e0d9cf}
+html.theme-light .badges span{color:#60584e;border-color:#d0c7bb}
+html.theme-light .filters button{color:#625b52;border-color:#d4ccc1}
+html.theme-light .search{border-color:#d4ccc1}
+html.theme-light .search input{color:#25211d}
+html.theme-light .search input::placeholder{color:#81786d}
+html.theme-light .feature-band,html.theme-light .reviews,html.theme-light .suggestions{background:#eeeae3}
+html.theme-light .process{background:linear-gradient(115deg,#efebe4,#e6e0d7)}
+html.theme-light .custom-visual{background:radial-gradient(circle at 50% 48%,#f2e6d0 0,#e5dccf 38%,#d7d0c7 75%)}
+html.theme-light .custom-visual:before,html.theme-light .custom-visual:after{border-color:#b89a67}
+html.theme-light .custom-visual span{color:#8f672c}
+html.theme-light .support{background:#efebe5}
+html.theme-light .suggestion-form{background:#fffdf9;border-color:#d6cec2}
+html.theme-light .suggestion-form label{color:#61584b}
+html.theme-light .suggestion-form label small,html.theme-light .suggestion-status{color:#776e62}
+html.theme-light .suggestion-form input,html.theme-light .suggestion-form textarea{background:#fff;color:#211d18;border-color:#cfc6ba}
+html.theme-light .cart-panel,html.theme-light .account-modal,html.theme-light .profile-modal,html.theme-light .preset-modal,html.theme-light .checkout-modal,html.theme-light .receipt-modal-card{background:#fffdf9;border-color:#d4cbbc;box-shadow:0 24px 70px #4d41211f}
+html.theme-light .cart-head,html.theme-light .cart-item,html.theme-light .cart-summary,html.theme-light .profile-grid article,html.theme-light .profile-order,html.theme-light .checkout-customer,html.theme-light .checkout-line,html.theme-light .bank-details,html.theme-light .bank-details div,html.theme-light .bank-order-summary,html.theme-light .bank-order-line{border-color:#ddd5ca}
+html.theme-light .empty-cart,html.theme-light .account-modal p:not(.eyebrow),html.theme-light .profile-email,html.theme-light .profile-empty small,html.theme-light .demo-note,html.theme-light .checkout-line small,html.theme-light .checkout-customer small,html.theme-light .payment-methods small,html.theme-light .bank-intro,html.theme-light .qr-intro,html.theme-light .qr-payment-card small,html.theme-light .gift-intro,html.theme-light .checkout-finish>p:not(.eyebrow),html.theme-light .receipt-upload small{color:#70675c!important}
+html.theme-light .account-modal label,html.theme-light .payment-methods legend,html.theme-light .bank-code span,html.theme-light .qr-total,html.theme-light .bank-details dt{color:#665d51}
+html.theme-light .account-modal input,html.theme-light .receipt-upload input,html.theme-light .admin-drive-input{background:#fff;color:#211d18;border-color:#cfc6ba}
+html.theme-light .checkout-order,html.theme-light .checkout-side,html.theme-light .payment-methods label,html.theme-light .qr-payment-card,html.theme-light .bank-order-summary{border-color:#d6cec3}
+html.theme-light .payment-methods label:has(input:checked),html.theme-light .gift-checkout-note,html.theme-light .gift-requirement,html.theme-light .preset-requirement,html.theme-light .profile-order.is-action:hover,html.theme-light .profile-order.is-action:focus-visible{background:#f6efe1}
+html.theme-light .bank-code{background:#f8f0e2;border-color:#c9aa76}
+html.theme-light .bank-details dd,html.theme-light .qr-payment-card b,html.theme-light .gift-requirement strong,html.theme-light .preset-requirement strong{color:#29231c}
+html.theme-light .close-cart,html.theme-light .close-account,html.theme-light .close-profile,html.theme-light .close-checkout,html.theme-light .close-preset{color:#28231d}
+html.theme-light .close-preset{background:#fffdf9e8}
+html.theme-light .overlay{background:#261f16a6}
+html.theme-light .admin-page{background:#f6f3ee;color:#1d1a16}
+html.theme-light .admin-topbar,html.theme-light .admin-toolbar,html.theme-light .admin-order,html.theme-light .admin-order-details,html.theme-light .admin-delivery{border-color:#d7d0c6}
+html.theme-light .admin-order{background:#fffdf9}
+html.theme-light .admin-brand,html.theme-light .admin-order-details b{color:#26211b}
+html.theme-light .admin-back,html.theme-light .admin-status,html.theme-light .admin-message,html.theme-light .admin-order-email,html.theme-light .admin-order-details{color:#6c645a}
+html.theme-light .admin-filter,html.theme-light .admin-order-state{border-color:#d3cbc0;color:#6c645a}
+html.theme-light .receipt-preview{background:#f3eee7}
+
+@media(max-width:560px){
+  .header-actions{gap:8px}
+  .theme-button{min-width:28px;padding:0}
+  .theme-button small{display:none}
+  .theme-symbol{font-size:20px}
+}
+@media(max-width:380px){
+  .site-header{padding-left:4vw;padding-right:4vw}
+  .brand{font-size:21px;gap:6px}
+  .brand-logo{width:38px;height:38px}
+  .header-actions{gap:4px}
+  .account-button small,.cart-button>span{display:none}
+  .cart-button{padding:8px 9px}
+  .cart-button b{margin-left:0}
+}

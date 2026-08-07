@@ -46,6 +46,32 @@ Object.assign(giftPreset, {
   demo: 'https://www.tiktok.com/@carlos_martineztf/video/7670328884759498005',
   description: 'Preset pensado para worship con un carácter high gain: ofrece ganancia, sustain y definición para líneas melódicas y momentos de mayor intensidad. Conserva un ambiente amplio para que el sonido se mantenga grande, expresivo y listo para destacar en la mezcla.'
 });
+
+// La apariencia es una preferencia local del visitante; no afecta su cuenta ni sus pedidos.
+const THEME_STORAGE_KEY = 'kay-guitar-theme';
+const themeToggle = document.querySelector('#theme-toggle');
+function renderThemeToggle() {
+  if (!themeToggle) return;
+  const isLight = document.documentElement.classList.contains('theme-light');
+  const label = document.querySelector('#theme-toggle-label');
+  const icon = themeToggle.querySelector('.theme-symbol');
+  themeToggle.setAttribute('aria-pressed', String(isLight));
+  themeToggle.setAttribute('aria-label', isLight ? 'Usar modo oscuro' : 'Usar modo claro');
+  themeToggle.title = isLight ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro';
+  if (label) label.textContent = isLight ? 'Oscuro' : 'Claro';
+  if (icon) icon.textContent = isLight ? '☾' : '☀';
+}
+function setTheme(theme) {
+  const isLight = theme === 'light';
+  document.documentElement.classList.toggle('theme-light', isLight);
+  try { window.localStorage.setItem(THEME_STORAGE_KEY, isLight ? 'light' : 'dark'); } catch (_) {}
+  renderThemeToggle();
+}
+if (themeToggle) {
+  renderThemeToggle();
+  themeToggle.addEventListener('click', () => setTheme(document.documentElement.classList.contains('theme-light') ? 'dark' : 'light'));
+}
+
 const CART_STORAGE_KEY = 'kay-guitar-cart-v1';
 function loadSavedCart() {
   try {

@@ -3,6 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <script>
+      (() => {
+        try {
+          if (localStorage.getItem('kay-guitar-theme') === 'light') {
+            document.documentElement.classList.add('theme-light');
+          }
+        } catch (_) {}
+      })();
+    </script>
     <meta name="description" content="KAY GUITAR — Presets premium para Valeton GP200 y clases de guitarra." />
     <title>KAY GUITAR — Sonido que inspira</title>
     <link rel="icon" type="image/png" href="assets/carlos-martinez-pick-logo-transparent.png?v=2" />
@@ -31,6 +40,10 @@
         <button class="icon-button account-button" aria-label="Iniciar sesión">
 <span>◎</span>
 <small>Cuenta</small>
+</button>
+        <button class="icon-button theme-button" id="theme-toggle" type="button" aria-label="Usar modo claro" aria-pressed="false" title="Cambiar apariencia">
+<span class="theme-symbol" aria-hidden="true">☀</span>
+<small id="theme-toggle-label">Claro</small>
 </button>
         <button class="cart-button" aria-label="Abrir carrito">
 <span>Carrito</span>
