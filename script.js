@@ -302,13 +302,13 @@ saveUsername.onclick = async () => {
     await setLoggedInUser(data.user);
   }
 };
-function openProfileModal() { refreshProfileOrders(); document.querySelector('.profile-modal').classList.add('open'); document.querySelector('.overlay').classList.add('open'); }
-function closeProfileModal() { document.querySelector('.profile-modal').classList.remove('open'); document.querySelector('.overlay').classList.remove('open'); }
+function openProfileModal() { refreshProfileOrders(); document.querySelector('.profile-modal').classList.add('open'); document.querySelector('.overlay').classList.add('open'); document.body.classList.add('profile-modal-open'); }
+function closeProfileModal() { document.querySelector('.profile-modal').classList.remove('open'); document.querySelector('.overlay').classList.remove('open'); document.body.classList.remove('profile-modal-open'); }
 document.querySelector('.account-button').onclick = () => currentAuthUser ? openProfileModal() : openAuthModal(false);
 document.querySelector('.close-account').onclick = closeAuthModal;
 document.querySelector('.close-profile').onclick = closeProfileModal;
 document.querySelector('#logout-button').onclick = async () => { if (supabaseClient) await supabaseClient.auth.signOut(); currentAuthUser = null; currentProfileName = ''; document.querySelector('.account-button small').textContent = 'Cuenta'; closeProfileModal(); };
-document.querySelector('.overlay').onclick = () => { document.querySelector('.cart-panel').classList.remove('open'); document.querySelector('.preset-modal').classList.remove('open'); document.querySelector('.profile-modal').classList.remove('open'); closeAuthModal(); if (!mustSignIn) document.querySelector('.overlay').classList.remove('open'); };
+document.querySelector('.overlay').onclick = () => { document.querySelector('.cart-panel').classList.remove('open'); document.querySelector('.preset-modal').classList.remove('open'); closeProfileModal(); closeAuthModal(); if (!mustSignIn) document.querySelector('.overlay').classList.remove('open'); };
 if (supabaseClient) { supabaseClient.auth.getSession().then(({ data: { session } }) => session ? setLoggedInUser(session.user) : openAuthModal(false)); } else { openAuthModal(false); }
 
 // API interna compartida con checkout.js. No contiene secretos y evita duplicar

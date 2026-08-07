@@ -43,9 +43,14 @@ Deno.serve(async (request) => {
     if (authError || !user) throw new Error('Debes iniciar sesión.');
     if (user.app_metadata?.role !== 'admin') throw new Error('No tienes permisos de administrador.');
 
-    const { order_id: orderId, download_url: downloadUrl } = await request.json();
+    const { order_id: orderId, download_url: legacyDownloadUrl, download_urls: submittedDownloadUrls } = await request.json();
     if (!/^[0-9a-f-]{36}$/i.test(String(orderId || ''))) throw new Error('El pedido no es válido.');
-    if (!validDriveUrl(String(downloadUrl || ''))) throw new Error('Usa un enlace válido de Google Drive.');
+    const downloadUrls = (Array.isArray(submittedDownloadUrls) ? submittedDownloadUrls : [legacyDownloadUrl])
+      .map((url) => String(url || '').trim())
+      .filter(Boolean);
+    if (!downloadUrls.length || downloadUrls.length > 12 || downloadUrls.some((url) => !validDriveUrl(url))) {
+      throw new Error('Usa de uno a doce enlaces válidos de Google Drive.');
+    }
 
     const service = createClient(url, serviceKey);
     const { data: order, error: orderError } = await service
@@ -60,7 +65,8 @@ Deno.serve(async (request) => {
 
     const items = Array.isArray(order.items) ? order.items : [];
     const productList = `<ul>${items.map((item: Record<string, unknown>) => `<li>${escapeHtml(item.name)} × ${escapeHtml(item.quantity)}</li>`).join('')}</ul>`;
-    const customerHtml = `<p>Hola ${escapeHtml(order.customer_name)}.</p><p>Gracias por tu compra en KAY GUITAR. Tu pago fue verificado y tus presets ya están listos para descargar.</p><p><b>Pedido:</b> ${escapeHtml(order.order_code)}</p><p><b>Productos incluidos:</b>${productList}</p><p><a href="${escapeHtml(downloadUrl)}" style="display:inline-block;background:#d6ad64;color:#11110f;padding:13px 18px;text-decoration:none;font-weight:bold">DESCARGAR MI PEDIDO</a></p><p>Si tienes algún problema con el enlace, responde a este correo o contacta a KAY GUITAR por WhatsApp.</p>`;
+    const downloadList = `<ul>${downloadUrls.map((url, index) => `<li><a href="${escapeHtml(url)}">Descargar archivo ${index + 1}</a></li>`).join('')}</ul>`;
+    const customerHtml = `<p>Hola ${escapeHtml(order.customer_name)}.</p><p>Gracias por tu compra en KAY GUITAR. Tu pago fue verificado y tus presets ya están listos para descargar.</p><p><b>Pedido:</b> ${escapeHtml(order.order_code)}</p><p><b>Productos incluidos:</b>${productList}</p><p><b>Enlaces de descarga:</b>${downloadList}</p><p>Si tienes algún problema con un enlace, responde a este correo o contacta a KAY GUITAR por WhatsApp.</p>`;
     const mail = await fetch(gmailUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -68,7 +74,7 @@ Deno.serve(async (request) => {
         to: order.customer_email,
         subject: `Tu pedido está listo · ${order.order_code}`,
         html: emailPage('Tu pedido está listo', customerHtml),
-        text: `Hola ${order.customer_name}. Tu pedido ${order.order_code} ya está listo. Descarga tus presets aquí: ${downloadUrl}`,
+        text: `Hola ${order.customer_name}. Tu pedido ${order.order_code} ya está listo. Enlaces de descarga: ${downloadUrls.join(' | ')}`,
       }] }),
     });
     const mailResult = await mail.json().catch(() => ({}));
@@ -76,7 +82,7 @@ Deno.serve(async (request) => {
 
     const { error: updateError } = await service.from('orders').update({
       status: 'delivered',
-      download_links: [{ title: `Descarga ${order.order_code}`, url: String(downloadUrl) }],
+      download_links: downloadUrls.map((url, index) => ({ title: `Descarga ${index + 1} · ${order.order_code}`, url })),
       delivered_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }).eq('id', order.id).in('status', ['pending_validation', 'payment_approved']);
