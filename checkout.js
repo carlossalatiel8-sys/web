@@ -1,6 +1,6 @@
-/* KAY GUITAR · Checkout
-   La página sólo muestra el pedido. Supabase calcula precios, guarda el pedido
-   y controla los estados; así el cliente no puede alterar los importes. */
+/* KAY GUITAR · Checkout manual seguro
+   Supabase calcula los importes, crea cada pedido y guarda la prueba privada.
+   PayPal se usa mediante QR manual; nunca se exponen claves privadas. */
 (() => {
   const store = window.KayGuitarStore;
   if (!store) return;
@@ -10,21 +10,25 @@
   const overlay = $('.overlay');
   const checkoutContent = $('#checkout-content');
   const bankContent = $('#bank-content');
+  const qrContent = $('#qr-content');
+  const giftContent = $('#gift-content');
   const finishContent = $('#checkout-finish');
   const checkoutButton = $('#checkout-button');
   const payButton = $('#checkout-pay-button');
-  const paypalButtons = $('#paypal-buttons');
-  const receiptUpload = $('#receipt-upload');
-  const receiptFile = $('#receipt-file');
+  const paymentMethods = $('#payment-methods');
+  const giftCheckoutNote = $('#gift-checkout-note');
   const message = $('#checkout-message');
   const checkoutConfig = window.KAY_GUITAR_CHECKOUT || {};
   const bank = checkoutConfig.bank || {};
+  const paypalQr = checkoutConfig.paypalQr || {};
 
   let order = null;
   let checkoutToken = null;
-  let paypalSdkPromise = null;
 
   const mxn = (value) => `$${Number(value || 0).toLocaleString('es-MX')} MXN`;
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
+  const isGiftProduct = (product) => Boolean(product?.claimRequired || product?.id === 'preset-regalo');
+
   function makeToken() {
     if (window.crypto?.randomUUID) return window.crypto.randomUUID();
     const bytes = new Uint8Array(16);
@@ -32,7 +36,7 @@
     else for (let index = 0; index < bytes.length; index += 1) bytes[index] = Math.floor(Math.random() * 256);
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    const hex = [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('');
+    const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
     return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
   }
 
@@ -51,12 +55,22 @@
     return cartLines().map(({ product_id, quantity }) => ({ product_id, quantity }));
   }
 
+  function giftOnlyCart() {
+    const lines = cartLines();
+    return Boolean(lines.length) && lines.every((line) => isGiftProduct(line.product));
+  }
+
+  function hasMixedCart() {
+    const lines = cartLines();
+    return lines.some((line) => isGiftProduct(line.product)) && lines.some((line) => !isGiftProduct(line.product));
+  }
+
   function setMessage(text = '', type = '') {
     message.textContent = text;
     message.className = `checkout-message ${type}`;
   }
 
-  function setPayBusy(busy, label = 'Pagar ahora') {
+  function setPayBusy(busy, label = 'Continuar') {
     payButton.disabled = busy;
     payButton.innerHTML = busy ? 'Procesando…' : `${label} <i>→</i>`;
   }
@@ -65,12 +79,20 @@
     return document.querySelector('input[name="payment-method"]:checked')?.value || 'bank_transfer';
   }
 
+  function paymentMethodLabel(method) {
+    return ({
+      bank_transfer: 'Continuar',
+      paypal_qr: 'Mostrar código QR',
+      gift_claim: 'Solicitar preset gratis',
+    })[method] || 'Continuar';
+  }
+
   function renderSummary() {
     const lines = cartLines();
-    const localTotal = lines.reduce((sum, line) => sum + line.product.price * line.quantity, 0);
+    const localTotal = lines.reduce((sum, line) => sum + Number(line.product.price || 0) * line.quantity, 0);
     $('#checkout-items').innerHTML = lines.map(({ product, quantity }) => `
       <div class="checkout-line">
-        <div><b>${product.name}</b><small>${mxn(product.price)} c/u</small></div>
+        <div><b>${escapeHtml(product.name)}</b><small>${mxn(product.price)} c/u</small></div>
         <span>×${quantity}</span><strong>${mxn(product.price * quantity)}</strong>
       </div>`).join('');
     $('#checkout-total').textContent = mxn(localTotal);
@@ -78,10 +100,36 @@
     $('#checkout-customer-email').textContent = store.getUser()?.email || '—';
   }
 
+  function clearProofForms() {
+    ['#receipt-upload', '#qr-receipt-upload', '#gift-proof-upload'].forEach((selector) => $(selector).classList.add('checkout-hidden'));
+    ['#receipt-file', '#qr-receipt-file', '#gift-proof-file'].forEach((selector) => { $(selector).value = ''; });
+  }
+
+  function resetScreen() {
+    clearProofForms();
+    checkoutContent.classList.remove('checkout-hidden');
+    bankContent.classList.add('checkout-hidden');
+    qrContent.classList.add('checkout-hidden');
+    giftContent.classList.add('checkout-hidden');
+    finishContent.classList.add('checkout-hidden');
+  }
+
+  function updateCheckoutMode() {
+    const isGift = giftOnlyCart();
+    paymentMethods.classList.toggle('checkout-hidden', isGift);
+    giftCheckoutNote.classList.toggle('checkout-hidden', !isGift);
+    setPayBusy(false, paymentMethodLabel(isGift ? 'gift_claim' : selectedMethod()));
+  }
+
   function open() {
     if (!cartLines().length) {
       store.closeCart();
       window.alert('Tu carrito está vacío. Añade al menos un preset para continuar.');
+      return;
+    }
+    if (hasMixedCart()) {
+      store.closeCart();
+      window.alert('El preset de regalo debe solicitarse por separado de los productos con pago. Quita uno de los tipos del carrito antes de continuar.');
       return;
     }
     if (!store.getUser()) {
@@ -91,14 +139,10 @@
     }
     order = null;
     checkoutToken = makeToken();
-    paypalButtons.innerHTML = '';
-    payButton.style.display = '';
-    receiptUpload.classList.add('checkout-hidden');
-    checkoutContent.classList.remove('checkout-hidden');
-    bankContent.classList.add('checkout-hidden');
-    finishContent.classList.add('checkout-hidden');
+    resetScreen();
     setMessage();
     renderSummary();
+    updateCheckoutMode();
     store.closeCart();
     modal.classList.add('open');
     overlay.classList.add('open');
@@ -116,7 +160,7 @@
     const { data, error } = await client.rpc('create_store_order', {
       p_items: orderPayload(),
       p_payment_method: paymentMethod,
-      p_checkout_token: checkoutToken
+      p_checkout_token: checkoutToken,
     });
     if (error) throw error;
     const created = Array.isArray(data) ? data[0] : data;
@@ -125,10 +169,44 @@
     return order;
   }
 
+  function savedOrderItems(existingOrder) {
+    const savedItems = Array.isArray(existingOrder.items) ? existingOrder.items : [];
+    if (savedItems.length) {
+      return savedItems.map((item) => ({
+        name: item.name || 'Preset',
+        quantity: Number(item.quantity || 1),
+        total: Number(item.line_total_mxn ?? (Number(item.unit_price_mxn || 0) * Number(item.quantity || 1))),
+      }));
+    }
+    return cartLines().map((line) => ({
+      name: line.product.name,
+      quantity: line.quantity,
+      total: Number(line.product.price || 0) * line.quantity,
+    }));
+  }
+
+  function renderOrderItems(existingOrder, summarySelector, itemsSelector) {
+    const summary = $(summarySelector);
+    const container = $(itemsSelector);
+    const items = savedOrderItems(existingOrder);
+    if (!items.length) {
+      summary.classList.add('checkout-hidden');
+      container.innerHTML = '';
+      return;
+    }
+    summary.classList.remove('checkout-hidden');
+    container.innerHTML = items.map((item) => `
+      <div class="bank-order-line">
+        <b>${escapeHtml(item.name)}</b>
+        <span>×${item.quantity}</span>
+        <strong>${mxn(item.total)}</strong>
+      </div>`).join('');
+  }
+
   function showBankDetails(createdOrder) {
     $('#bank-order-code').textContent = createdOrder.order_code;
     $('#bank-total').textContent = mxn(createdOrder.total_mxn);
-    renderBankOrderItems(createdOrder);
+    renderOrderItems(createdOrder, '#bank-order-summary', '#bank-order-items');
     $('#bank-name').textContent = bank.bank || 'Pendiente de configurar';
     $('#bank-holder').textContent = bank.accountHolder || 'Pendiente de configurar';
     $('#bank-clabe').textContent = bank.clabe || 'Pendiente de configurar';
@@ -136,77 +214,30 @@
     $('#bank-card').textContent = bank.cardNumber || '—';
     cardRow.style.display = bank.cardNumber ? '' : 'none';
     checkoutContent.classList.add('checkout-hidden');
+    qrContent.classList.add('checkout-hidden');
+    giftContent.classList.add('checkout-hidden');
     bankContent.classList.remove('checkout-hidden');
   }
 
-  function renderBankOrderItems(existingOrder) {
-    const savedItems = Array.isArray(existingOrder.items) ? existingOrder.items : [];
-    const items = savedItems.length
-      ? savedItems.map(item => ({
-        name: item.name || 'Preset',
-        quantity: Number(item.quantity || 1),
-        total: Number(item.line_total_mxn ?? item.unit_price_mxn ?? 0)
-      }))
-      : cartLines().map(line => ({
-        name: line.product.name,
-        quantity: line.quantity,
-        total: line.product.price * line.quantity
-      }));
-
-    const summary = $('#bank-order-summary');
-    const container = $('#bank-order-items');
-    if (!items.length) {
-      summary.classList.add('checkout-hidden');
-      container.innerHTML = '';
-      return;
-    }
-    summary.classList.remove('checkout-hidden');
-    container.innerHTML = items.map(item => `
-      <div class="bank-order-line">
-        <b>${item.name}</b>
-        <span>×${item.quantity}</span>
-        <strong>${mxn(item.total)}</strong>
-      </div>`).join('');
+  function showQrDetails(createdOrder) {
+    $('#paypal-qr-image').src = paypalQr.image || 'assets/paypal-qr.jpg';
+    $('#paypal-qr-recipient').textContent = `Paga a ${paypalQr.recipient || 'Carlos Salatiel Martinez Jimenes'}`;
+    $('#qr-order-code').textContent = createdOrder.order_code;
+    $('#qr-total').textContent = mxn(createdOrder.total_mxn);
+    renderOrderItems(createdOrder, '#qr-order-summary', '#qr-order-items');
+    checkoutContent.classList.add('checkout-hidden');
+    bankContent.classList.add('checkout-hidden');
+    giftContent.classList.add('checkout-hidden');
+    qrContent.classList.remove('checkout-hidden');
   }
 
-  // Un pedido por transferencia puede retomarse desde "Mi perfil" después de
-  // que el cliente salga a realizar el pago. No se crea otro pedido: se usa el
-  // mismo código y solamente se habilita la carga de su comprobante.
-  function resumeBankTransfer(existingOrder) {
-    if (!store.getUser()) {
-      store.requireCheckoutAuthentication();
-      return;
-    }
-    if (!existingOrder?.id || existingOrder.payment_method !== 'bank_transfer') {
-      window.alert('Este pedido no corresponde a una transferencia bancaria.');
-      return;
-    }
-
-    order = existingOrder;
-    checkoutToken = null;
-    paypalButtons.innerHTML = '';
-    payButton.style.display = '';
-    receiptFile.value = '';
-    receiptUpload.classList.add('checkout-hidden');
-    finishContent.classList.add('checkout-hidden');
-
-    if (existingOrder.status === 'pending_validation') {
-      bankContent.classList.add('checkout-hidden');
-      checkoutContent.classList.add('checkout-hidden');
-      showFinish(
-        existingOrder.order_code,
-        'Comprobante recibido.',
-        'Tu comprobante ya fue enviado y el pago está pendiente de validación. Te avisaremos por correo cuando sea aprobado.'
-      );
-    } else if (existingOrder.status === 'pending_payment') {
-      showBankDetails(existingOrder);
-    } else {
-      window.alert('Este pedido ya no requiere un comprobante.');
-      return;
-    }
-
-    modal.classList.add('open');
-    overlay.classList.add('open');
+  function showGiftDetails(createdOrder) {
+    $('#gift-order-code').textContent = createdOrder.order_code;
+    renderOrderItems(createdOrder, '#gift-order-summary', '#gift-order-items');
+    checkoutContent.classList.add('checkout-hidden');
+    bankContent.classList.add('checkout-hidden');
+    qrContent.classList.add('checkout-hidden');
+    giftContent.classList.remove('checkout-hidden');
   }
 
   function configureBankDetails() {
@@ -221,8 +252,8 @@
     if (value.includes('session') || value.includes('jwt') || value.includes('iniciar sesión')) return 'Tu sesión terminó. Inicia sesión de nuevo para continuar.';
     if (value.includes('disponible')) return 'Uno de los productos ya no está disponible. Revisa tu carrito.';
     if (value.includes('uuid') || value.includes('input syntax')) return 'No se pudo preparar el código seguro del pedido. Recarga la página e inténtalo de nuevo.';
-    if (value.includes('create_store_order') || value.includes('schema cache') || value.includes('function')) return 'La configuración de pedidos de la tienda necesita activarse en Supabase. Ejecuta el archivo supabase-orders-setup.sql y vuelve a intentar.';
-    if (value.includes('ambiguous')) return 'La configuración de pedidos necesita actualizarse en Supabase. Ejecuta de nuevo el archivo supabase-orders-setup.sql.';
+    if (value.includes('create_store_order') || value.includes('submit_order_proof') || value.includes('método de pago') || value.includes('schema cache') || value.includes('function')) return 'La configuración de QR y regalos necesita activarse en Supabase. Ejecuta supabase-qr-y-regalos.sql y vuelve a intentar.';
+    if (value.includes('ambiguous')) return 'La configuración de pedidos necesita actualizarse en Supabase. Ejecuta supabase-qr-y-regalos.sql.';
     const code = String(error?.code || 'sin-código').slice(0, 32);
     return `${fallback} Código de revisión: ${code}.`;
   }
@@ -234,8 +265,7 @@
     }
     setPayBusy(true, 'Continuar');
     try {
-      const created = await createOrder('bank_transfer');
-      showBankDetails(created);
+      showBankDetails(await createOrder('bank_transfer'));
     } catch (error) {
       setMessage(getErrorMessage(error, 'No fue posible crear tu pedido. Intenta de nuevo.'), 'error');
     } finally {
@@ -243,114 +273,131 @@
     }
   }
 
-  function loadPayPalSdk() {
-    if (window.paypal) return Promise.resolve(window.paypal);
-    if (paypalSdkPromise) return paypalSdkPromise;
-    const clientId = checkoutConfig.paypalClientId;
-    if (!clientId) return Promise.reject(new Error('PayPal aún no está configurado.'));
-    paypalSdkPromise = new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=${encodeURIComponent(checkoutConfig.paypalCurrency || 'MXN')}&intent=capture&components=buttons`;
-      script.onload = () => resolve(window.paypal);
-      script.onerror = () => reject(new Error('No se pudo cargar PayPal. Revisa tu conexión e intenta de nuevo.'));
-      document.head.appendChild(script);
-    });
-    return paypalSdkPromise;
+  async function startPaypalQr() {
+    setPayBusy(true, 'Mostrar código QR');
+    try {
+      showQrDetails(await createOrder('paypal_qr'));
+    } catch (error) {
+      setMessage(getErrorMessage(error, 'No fue posible preparar el pago con QR. Intenta de nuevo.'), 'error');
+    } finally {
+      setPayBusy(false, 'Mostrar código QR');
+    }
   }
 
-  async function startPayPal() {
-    if (!checkoutConfig.paypalClientId) {
-      setMessage('PayPal aún no está disponible. Elige transferencia bancaria o intenta más tarde.', 'error');
-      return;
-    }
-    setPayBusy(true);
+  async function startGiftClaim() {
+    setPayBusy(true, 'Solicitar preset gratis');
     try {
-      const created = await createOrder('paypal');
-      const client = store.getClient();
-      const { data, error } = await client.functions.invoke('paypal-create-order', { body: { order_id: created.id } });
-      if (error) throw error;
-      if (!data?.paypal_order_id) throw new Error('PayPal no devolvió un identificador de pago.');
-      const paypal = await loadPayPalSdk();
-      paypalButtons.innerHTML = '';
-      payButton.style.display = 'none';
-      setMessage('Confirma tu pago de forma segura con PayPal.', 'success');
-      paypal.Buttons({
-        createOrder: () => data.paypal_order_id,
-        onApprove: async () => {
-          setMessage('Confirmando tu pago…');
-          const captured = await client.functions.invoke('paypal-capture-order', { body: { order_id: created.id } });
-          if (captured.error || !captured.data?.approved) {
-            setMessage('PayPal no pudo confirmar el pago. Revisa tu cuenta antes de volver a intentarlo.', 'error');
-            return;
-          }
-          showFinish(created.order_code, 'Pago aprobado.', 'Gracias por tu compra. Tu pago fue aprobado correctamente. En unos minutos recibirás un correo con tus enlaces de descarga.');
-        },
-        onCancel: () => {
-          payButton.style.display = '';
-          setMessage('El pago se canceló. Tu pedido quedó pendiente de pago.', 'error');
-        },
-        onError: () => {
-          payButton.style.display = '';
-          setMessage('PayPal no pudo procesar el pago. Intenta de nuevo o usa transferencia.', 'error');
-        }
-      }).render('#paypal-buttons');
+      showGiftDetails(await createOrder('gift_claim'));
     } catch (error) {
-      setMessage(getErrorMessage(error, 'No fue posible iniciar PayPal. Intenta de nuevo.'), 'error');
+      setMessage(getErrorMessage(error, 'No fue posible preparar la solicitud. Intenta de nuevo.'), 'error');
     } finally {
-      setPayBusy(false);
+      setPayBusy(false, 'Solicitar preset gratis');
     }
   }
 
   async function notifyOrder(event, orderId) {
-    // El correo es una función de servidor. Si aún no fue desplegada, el pedido
-    // sigue guardado; no se muestra un error de pago por un fallo de correo.
     try {
       await store.getClient().functions.invoke('order-email', { body: { event, order_id: orderId } });
-    } catch (_) { /* La función se activa al terminar la configuración de correo. */ }
+    } catch (_) { /* El pedido ya quedó guardado aunque el correo se reintente después. */ }
   }
 
   function cleanFileName(name) {
-    return name.replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-');
+    return String(name || 'archivo').replace(/[^a-zA-Z0-9._-]/g, '-').replace(/-+/g, '-');
   }
 
-  async function submitReceipt() {
-    const file = receiptFile.files?.[0];
-    const permitted = ['application/pdf', 'image/png', 'image/jpeg'];
-    if (!file) { window.alert('Selecciona tu comprobante antes de enviarlo.'); return; }
-    if (!permitted.includes(file.type) || !/\.(pdf|png|jpe?g)$/i.test(file.name)) {
-      window.alert('El comprobante debe ser PDF, PNG, JPG o JPEG.'); return;
+  function proofConfig(kind) {
+    return {
+      bank: {
+        input: '#receipt-file', button: '#submit-receipt-button', submissionKind: 'payment_receipt', event: 'payment_proof', label: 'comprobante', allowPdf: true,
+        successTitle: 'Pedido recibido.', successCopy: 'Hemos recibido tu comprobante. En unos minutos verificaremos el pago y, una vez aprobado, recibirás un segundo correo con tus enlaces de descarga.',
+      },
+      qr: {
+        input: '#qr-receipt-file', button: '#submit-qr-receipt-button', submissionKind: 'payment_receipt', event: 'payment_proof', label: 'comprobante de pago', allowPdf: true,
+        successTitle: 'Comprobante recibido.', successCopy: 'Hemos recibido tu comprobante de pago con QR de PayPal. Verificaremos el importe antes de enviarte tus enlaces de descarga.',
+      },
+      gift: {
+        input: '#gift-proof-file', button: '#submit-gift-proof-button', submissionKind: 'social_follow_proof', event: 'gift_requirement', label: 'captura del requisito', allowPdf: false,
+        successTitle: 'Solicitud recibida.', successCopy: 'Hemos recibido tu captura. Verificaremos que sigues a @kayguitar14 antes de enviarte el preset de regalo.',
+      },
+    }[kind];
+  }
+
+  async function submitProof(kind) {
+    const config = proofConfig(kind);
+    const file = $(config.input).files?.[0];
+    const permitted = config.allowPdf ? ['application/pdf', 'image/png', 'image/jpeg'] : ['image/png', 'image/jpeg'];
+    const extension = config.allowPdf ? /\.(pdf|png|jpe?g)$/i : /\.(png|jpe?g)$/i;
+    if (!file) { window.alert(`Selecciona tu ${config.label} antes de enviarlo.`); return; }
+    if (!permitted.includes(file.type) || !extension.test(file.name)) {
+      window.alert(config.allowPdf ? 'El archivo debe ser PDF, PNG, JPG o JPEG.' : 'La captura debe ser PNG, JPG o JPEG.');
+      return;
     }
-    if (file.size > 10 * 1024 * 1024) { window.alert('El comprobante supera el límite de 10 MB.'); return; }
+    if (file.size > 10 * 1024 * 1024) { window.alert('El archivo supera el límite de 10 MB.'); return; }
     if (!order?.id || !store.getUser()) { window.alert('No encontramos tu pedido. Vuelve a iniciar el checkout.'); return; }
 
-    const button = $('#submit-receipt-button');
+    const button = $(config.button);
     button.disabled = true;
-    button.textContent = 'Enviando comprobante…';
+    button.textContent = `Enviando ${config.label}…`;
     try {
       const path = `${store.getUser().id}/${order.id}/${Date.now()}-${cleanFileName(file.name)}`;
       const client = store.getClient();
       const { error: uploadError } = await client.storage.from('payment-receipts').upload(path, file, {
         contentType: file.type,
-        upsert: false
+        upsert: false,
       });
       if (uploadError) throw uploadError;
-      const { error: receiptError } = await client.rpc('submit_bank_receipt', {
+      const { error: proofError } = await client.rpc('submit_order_proof', {
         p_order_id: order.id,
-        p_receipt_path: path
+        p_receipt_path: path,
+        p_submission_kind: config.submissionKind,
       });
-      if (receiptError) throw receiptError;
-      await notifyOrder('bank_receipt', order.id);
-      showFinish(order.order_code, 'Pedido recibido.', 'Hemos recibido tu comprobante. En unos minutos verificaremos el pago y, una vez aprobado, recibirás un segundo correo con tus enlaces de descarga.');
+      if (proofError) throw proofError;
+      await notifyOrder(config.event, order.id);
+      showFinish(order.order_code, config.successTitle, config.successCopy);
     } catch (error) {
-      window.alert(getErrorMessage(error, 'No fue posible subir el comprobante. Intenta de nuevo.'));
+      window.alert(getErrorMessage(error, `No fue posible subir tu ${config.label}. Intenta de nuevo.`));
     } finally {
       button.disabled = false;
-      button.innerHTML = 'Enviar comprobante <i>→</i>';
+      button.innerHTML = kind === 'gift' ? 'Enviar solicitud <i>→</i>' : 'Enviar comprobante <i>→</i>';
     }
+  }
+
+  function finishCopyFor(existingOrder) {
+    if (existingOrder.payment_method === 'gift_claim') return 'Tu captura ya fue enviada y la solicitud está pendiente de validación. Te avisaremos por correo cuando esté lista.';
+    if (existingOrder.payment_method === 'paypal_qr') return 'Tu comprobante de pago con QR ya fue enviado y está pendiente de validación. Te avisaremos por correo cuando sea aprobado.';
+    return 'Tu comprobante ya fue enviado y el pago está pendiente de validación. Te avisaremos por correo cuando sea aprobado.';
+  }
+
+  function resumeManualOrder(existingOrder) {
+    if (!store.getUser()) {
+      store.requireCheckoutAuthentication();
+      return;
+    }
+    if (!existingOrder?.id || !['bank_transfer', 'paypal_qr', 'gift_claim'].includes(existingOrder.payment_method)) {
+      window.alert('Este pedido no corresponde a un pago o solicitud manual.');
+      return;
+    }
+    order = existingOrder;
+    checkoutToken = null;
+    resetScreen();
+    if (existingOrder.status === 'pending_validation') {
+      showFinish(existingOrder.order_code, existingOrder.payment_method === 'gift_claim' ? 'Captura recibida.' : 'Comprobante recibido.', finishCopyFor(existingOrder));
+    } else if (existingOrder.status === 'pending_payment') {
+      if (existingOrder.payment_method === 'bank_transfer') showBankDetails(existingOrder);
+      if (existingOrder.payment_method === 'paypal_qr') showQrDetails(existingOrder);
+      if (existingOrder.payment_method === 'gift_claim') showGiftDetails(existingOrder);
+    } else {
+      window.alert('Este pedido ya no requiere una acción de tu parte.');
+      return;
+    }
+    modal.classList.add('open');
+    overlay.classList.add('open');
   }
 
   function showFinish(orderCode, title, copy) {
     bankContent.classList.add('checkout-hidden');
+    qrContent.classList.add('checkout-hidden');
+    giftContent.classList.add('checkout-hidden');
     checkoutContent.classList.add('checkout-hidden');
     finishContent.classList.remove('checkout-hidden');
     $('#finish-title').textContent = title;
@@ -364,21 +411,22 @@
   $('#back-to-catalog').addEventListener('click', close);
   payButton.addEventListener('click', () => {
     setMessage();
-    if (selectedMethod() === 'paypal') startPayPal(); else startBankTransfer();
+    if (giftOnlyCart()) { startGiftClaim(); return; }
+    if (selectedMethod() === 'paypal_qr') startPaypalQr(); else startBankTransfer();
   });
   document.querySelectorAll('input[name="payment-method"]').forEach((input) => input.addEventListener('change', () => {
     setMessage();
     order = null;
     checkoutToken = makeToken();
-    paypalButtons.innerHTML = '';
-    payButton.style.display = '';
+    updateCheckoutMode();
   }));
-  $('#show-receipt-button').addEventListener('click', () => {
-    receiptUpload.classList.remove('checkout-hidden');
-    receiptFile.focus();
-  });
-  $('#submit-receipt-button').addEventListener('click', submitReceipt);
+  $('#show-receipt-button').addEventListener('click', () => { $('#receipt-upload').classList.remove('checkout-hidden'); $('#receipt-file').focus(); });
+  $('#show-qr-receipt-button').addEventListener('click', () => { $('#qr-receipt-upload').classList.remove('checkout-hidden'); $('#qr-receipt-file').focus(); });
+  $('#show-gift-proof-button').addEventListener('click', () => { $('#gift-proof-upload').classList.remove('checkout-hidden'); $('#gift-proof-file').focus(); });
+  $('#submit-receipt-button').addEventListener('click', () => submitProof('bank'));
+  $('#submit-qr-receipt-button').addEventListener('click', () => submitProof('qr'));
+  $('#submit-gift-proof-button').addEventListener('click', () => submitProof('gift'));
   overlay.addEventListener('click', () => { if (modal.classList.contains('open')) close(); });
 
-  window.KayGuitarCheckout = { open, close, resumeBankTransfer };
+  window.KayGuitarCheckout = { open, close, resumeManualOrder, resumeBankTransfer: resumeManualOrder };
 })();

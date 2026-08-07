@@ -1,94 +1,66 @@
 # Activar el checkout de KAY GUITAR
 
-La interfaz ya está creada, pero estas configuraciones se hacen una sola vez
-para que los pedidos, comprobantes, PayPal y correos funcionen de verdad.
+La tienda usa pagos manuales: transferencia bancaria o código QR de PayPal.
+Ninguna clave privada de PayPal se guarda en la página.
 
-## 1. Crear tablas y comprobantes privados
+## Tienda que ya está funcionando
 
-1. Entra a tu proyecto de Supabase.
-2. Abre **SQL Editor** y crea una consulta nueva.
-3. Abre el archivo `supabase-orders-setup.sql` de esta carpeta, copia todo su
-   contenido, pégalo en Supabase y pulsa **Run**.
+1. En Supabase abre **SQL Editor** → **New query**.
+2. Copia todo el archivo `supabase-qr-y-regalos.sql`, pégalo y pulsa **Run**.
+3. Luego publica los cambios de GitHub Desktop.
 
-Esto crea los productos del servidor, pedidos con códigos `PED-1001`, el bucket
-privado de comprobantes y sus reglas de seguridad. No hay que crear carpetas
-manualmente en Storage.
+Este paso activa el QR de PayPal, los comprobantes y la solicitud segura del
+preset de regalo. No borra usuarios, pedidos ni comprobantes existentes.
 
-## 2. Completar datos de transferencia
+## Instalación desde cero
 
-En `supabase-config.js`, reemplaza solamente estos cuatro textos:
+Primero ejecuta `supabase-orders-setup.sql` y, al terminar, ejecuta
+`supabase-qr-y-regalos.sql` una sola vez.
 
-```js
-bank: {
-  bank: 'Nombre del banco',
-  accountHolder: 'Nombre completo del titular',
-  clabe: 'Tu CLABE de 18 dígitos',
-  cardNumber: '' // Déjalo vacío si no quieres mostrar tarjeta.
-}
-```
+## Pago con código QR de PayPal
 
-La CLABE se muestra al cliente, por lo que es correcto que esté en este archivo.
-No pongas contraseñas, claves de acceso ni datos privados de la banca.
+El archivo `assets/paypal-qr.jpg` es el QR público de la cuenta de cobro. El
+cliente sigue este proceso:
 
-## 3. Activar PayPal de forma segura
+1. Escanea el QR desde PayPal.
+2. Paga el total exacto mostrado por la tienda.
+3. Sube su comprobante en formato PDF, PNG, JPG o JPEG.
+4. El pedido queda **Pendiente de validación** hasta que revises que el pago
+   llegó correctamente a PayPal.
 
-1. Crea una app **Live** en el panel de desarrolladores de PayPal.
-2. Copia el **Client ID** público y pégalo en `paypalClientId` dentro de
-   `supabase-config.js`.
-3. Conserva el **Client Secret** sólo para los secretos de Supabase; nunca lo
-   pegues en `index.html`, `script.js` ni lo subas a GitHub.
+No se necesitan Client ID ni Client Secret de PayPal para este flujo.
 
-Desde una computadora con la CLI de Supabase instalada y abierta en esta
-carpeta, ejecuta:
+## Preset de regalo
 
-```powershell
-npx supabase login
-npx supabase link --project-ref mfmjrndhkevttwxwljvh
-npx supabase secrets set PAYPAL_CLIENT_ID="TU_CLIENT_ID" PAYPAL_CLIENT_SECRET="TU_CLIENT_SECRET" PAYPAL_ENVIRONMENT="live"
-npx supabase functions deploy paypal-create-order
-npx supabase functions deploy paypal-capture-order
-```
+El preset de regalo no muestra transferencia ni QR. Se debe pedir separado de
+los productos pagados y exige una captura donde se vea que el cliente sigue a
+`@kayguitar14` en Instagram. La solicitud queda pendiente hasta que la revises.
 
-Para hacer pruebas antes de vender, usa primero credenciales **Sandbox** y cambia
-`PAYPAL_ENVIRONMENT` a `sandbox`. Cuando todo esté probado, usa Live en ambos
-lugares.
+## Correos
 
-## 4. Activar correos desde Gmail
+Después de actualizar los archivos de esta carpeta, vuelve a desplegar la
+función de Supabase llamada `order-email`. En el editor web puedes reemplazar
+su `index.ts` por el archivo con el mismo nombre de esta carpeta: es
+autocontenido y no requiere crear archivos extra. Esa actualización hace que
+el correo distinga entre:
 
-La tienda puede enviar desde un Gmail sin comprar dominio. Sigue el archivo
-`GOOGLE-GMAIL-SETUP.md` para crear el servicio de Google Apps Script y guardar
-su URL y secreto en Supabase. El correo al administrador contiene pedido,
-cliente, correo, productos, total, método, estado y el comprobante adjunto.
-Los clientes reciben la confirmación correspondiente. La base evita que un
-reintento mande el mismo aviso dos veces.
+- comprobante de transferencia;
+- comprobante de pago con QR de PayPal;
+- captura del requisito de un preset de regalo.
 
-## 5. Publicar los cambios de la página
+Los secretos actuales de Gmail no cambian.
 
-Sube a GitHub Pages todos los cambios de esta carpeta, incluyendo:
+## Publicar la página
 
-- `index.html`
-- `styles.css`
-- `script.js`
-- `checkout.js`
-- `supabase-config.js`
-
-La carpeta `supabase/functions` no se publica en GitHub Pages: se despliega en
-Supabase con los comandos de los pasos 3 y 4.
-
-## Entrega por Google Drive
-
-Cuando apruebes una transferencia o quieras completar un pedido de PayPal,
-añade los enlaces de Google Drive en el correo de respuesta al cliente. La tabla
-`orders` ya tiene el campo `download_links` preparado para que más adelante el
-panel administrativo pueda guardar y mostrar esas descargas.
+En GitHub Desktop selecciona todos los cambios, escribe un resumen como
+`Pago QR y preset de regalo`, pulsa **Commit to main** y luego **Push origin**.
+GitHub Pages normalmente muestra la actualización en unos minutos.
 
 ## Seguridad incluida
 
-- No se puede comprar sin sesión.
-- Los precios y el total se recalculan en Supabase, no en el navegador.
-- Los clientes sólo pueden consultar sus propios pedidos.
-- No pueden modificar estados, totales ni enlaces de descarga.
-- Los comprobantes son privados y sólo se pueden subir con PDF, PNG, JPG o JPEG
-  de hasta 10 MB.
-- El código de pedido se genera automáticamente y los pedidos usan un token para
-  evitar duplicados por doble clic.
+- Sólo una sesión iniciada puede crear un pedido.
+- Supabase vuelve a calcular productos, cantidades y precios.
+- Un regalo no se puede mezclar con una compra pagada.
+- Un regalo requiere una captura y no se puede hacer pasar por transferencia.
+- Los comprobantes y capturas son privados, con tamaño máximo de 10 MB.
+- Los clientes no pueden cambiar estados, totales ni enlaces de descarga.

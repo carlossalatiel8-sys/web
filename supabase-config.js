@@ -14,8 +14,10 @@ window.KAY_GUITAR_CHECKOUT = {
     clabe: '722969020186576200',
     cardNumber: ''
   },
-  // Este identificador es público. La clave secreta de PayPal NUNCA va aquí:
-  // se configura como secreto en las funciones de Supabase.
-  paypalClientId: '',
-  paypalCurrency: 'MXN'
+  // El QR se usa para iniciar el pago de forma manual. Después, el cliente
+  // debe subir un comprobante para que el pedido sea validado.
+  paypalQr: {
+    image: 'assets/paypal-qr.jpg',
+    recipient: 'Carlos Salatiel Martinez Jimenes'
+  }
 };

@@ -397,7 +397,7 @@
 <span>Total</span>
 <strong id="cart-total">$0 MXN</strong>
 </div>
-<small>Pago seguro por transferencia bancaria o PayPal.</small>
+<small>Pago por transferencia bancaria o código QR de PayPal.</small>
 <button class="button gold checkout" id="checkout-button">Continuar al pago <i>→</i>
 </button>
 </div>
@@ -431,7 +431,7 @@
 <b id="checkout-customer-name">—</b>
 <small id="checkout-customer-email">—</small>
 </div>
-<fieldset class="payment-methods">
+<fieldset class="payment-methods" id="payment-methods">
 <legend>MÉTODO DE PAGO</legend>
 <label>
 <input type="radio" name="payment-method" value="bank_transfer" checked />
@@ -441,19 +441,22 @@
 </span>
 </label>
 <label>
-<input type="radio" name="payment-method" value="paypal" />
+<input type="radio" name="payment-method" value="paypal_qr" />
 <span>
-<b>PayPal</b>
-<small>Pago seguro con PayPal.</small>
+<b>PayPal con código QR</b>
+<small>Escanea, paga el total y sube tu comprobante.</small>
 </span>
 </label>
 </fieldset>
+<div class="gift-checkout-note checkout-hidden" id="gift-checkout-note">
+<p>PRESET DE REGALO</p>
+<b>Este preset no requiere pago.</b>
+<small>Primero sube una captura donde se vea que sigues a @kayguitar14 en Instagram.</small>
+</div>
 <p class="checkout-message" id="checkout-message" aria-live="polite">
 </p>
 <button class="button gold checkout-pay-button" id="checkout-pay-button">Pagar ahora <i>→</i>
 </button>
-<div id="paypal-buttons" class="paypal-buttons" aria-live="polite">
-</div>
 </aside>
 </div>
 </div>
@@ -503,6 +506,56 @@
 <small>Formatos permitidos: PDF, PNG, JPG o JPEG. Máximo 10 MB.</small>
 <button class="button gold" id="submit-receipt-button">Enviar comprobante <i>→</i>
 </button>
+</div>
+</div>
+<div class="qr-content checkout-hidden" id="qr-content">
+<p class="eyebrow"><span></span> PAGO CON PAYPAL</p>
+<h2>Escanea el<br /><em>código QR.</em></h2>
+<p class="qr-intro">Escanea este código desde PayPal, paga exactamente el total indicado y después sube tu comprobante para que validemos el pago.</p>
+<div class="qr-payment-card">
+<img id="paypal-qr-image" src="assets/paypal-qr.jpg" alt="Código QR de PayPal para pagar a Carlos Salatiel Martinez Jimenes" />
+<div>
+<b id="paypal-qr-recipient">Paga a Carlos Salatiel Martinez Jimenes</b>
+<small>Si estás usando este mismo teléfono, guarda la imagen del QR o ábrela desde otro dispositivo para escanearla.</small>
+</div>
+</div>
+<div class="bank-code">
+<span>PEDIDO</span>
+<strong id="qr-order-code">PED-0000</strong>
+</div>
+<section class="bank-order-summary" id="qr-order-summary">
+<p>RESUMEN DEL PEDIDO</p>
+<div id="qr-order-items"></div>
+</section>
+<div class="qr-total">Total a pagar <strong id="qr-total">$0 MXN</strong></div>
+<button class="button gold" id="show-qr-receipt-button">Ya realicé el pago <i>→</i></button>
+<div class="receipt-upload checkout-hidden" id="qr-receipt-upload">
+<label>Subir comprobante de pago<input id="qr-receipt-file" type="file" accept="application/pdf,image/png,image/jpeg" /></label>
+<small>Formatos permitidos: PDF, PNG, JPG o JPEG. Máximo 10 MB.</small>
+<button class="button gold" id="submit-qr-receipt-button">Enviar comprobante <i>→</i></button>
+</div>
+</div>
+<div class="gift-content checkout-hidden" id="gift-content">
+<p class="eyebrow"><span></span> PRESET DE REGALO</p>
+<h2>Solicita tu<br /><em>regalo.</em></h2>
+<p class="gift-intro">Este preset es gratis. Completa el requisito y envía tu captura para que podamos validarla antes de entregártelo.</p>
+<div class="gift-requirement">
+<p>REQUISITO OBLIGATORIO</p>
+<strong>Sigue a @kayguitar14 en Instagram y sube una captura donde se vea que ya sigues la cuenta.</strong>
+</div>
+<div class="bank-code">
+<span>SOLICITUD</span>
+<strong id="gift-order-code">PED-0000</strong>
+</div>
+<section class="bank-order-summary" id="gift-order-summary">
+<p>PRESET SOLICITADO</p>
+<div id="gift-order-items"></div>
+</section>
+<button class="button gold" id="show-gift-proof-button">Ya tengo mi captura <i>→</i></button>
+<div class="receipt-upload checkout-hidden" id="gift-proof-upload">
+<label>Subir captura del requisito<input id="gift-proof-file" type="file" accept="image/png,image/jpeg" /></label>
+<small>Formatos permitidos: PNG, JPG o JPEG. Máximo 10 MB.</small>
+<button class="button gold" id="submit-gift-proof-button">Enviar solicitud <i>→</i></button>
 </div>
 </div>
 <div class="checkout-finish checkout-hidden" id="checkout-finish">
@@ -593,6 +646,10 @@
 </div>
 <p id="preset-modal-description">
 </p>
+<div class="preset-requirement" id="preset-requirement" hidden>
+<p>REQUISITO PARA SOLICITARLO</p>
+<strong id="preset-requirement-copy"></strong>
+</div>
 <strong id="preset-modal-price">
 </strong>
 <p id="preset-demo-note" class="demo-note">

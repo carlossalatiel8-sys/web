@@ -9,6 +9,7 @@
   const receiptModal = $('#receipt-modal');
   const receiptPreview = $('#receipt-preview');
   const receiptTitle = $('#receipt-title');
+  const receiptEyebrow = $('#receipt-eyebrow');
   const labels = { pending_payment: 'Pendiente de pago', pending_validation: 'Pendiente de validación', payment_approved: 'Pago aprobado', payment_rejected: 'Pago rechazado', cancelled: 'Cancelado', delivered: 'Entregado' };
 
   function escapeHtml(value) {
@@ -17,6 +18,7 @@
   function setMessage(text = '', type = '') { message.textContent = text; message.className = `admin-message ${type}`; }
   function productsText(items) { return Array.isArray(items) && items.length ? items.map((item) => `${item.name || 'Preset'} × ${item.quantity || 1}`).join(', ') : 'Sin detalle'; }
   function canDeliver(order) { return ['pending_validation', 'payment_approved'].includes(order.status); }
+  function evidenceLabel(order) { return order.submission_kind === 'social_follow_proof' || order.payment_method === 'gift_claim' ? 'captura del requisito' : 'comprobante de pago'; }
 
   function render() {
     const visible = state.filter === 'all' ? state.orders : state.orders.filter((order) => order.status === state.filter);
@@ -24,14 +26,15 @@
     ordersContainer.innerHTML = visible.map((order) => {
       const delivery = canDeliver(order) ? `<div class="admin-delivery"><div class="admin-links"><input class="admin-drive-input" type="url" placeholder="Pega aquí el enlace de Google Drive" aria-label="Enlace de Drive para ${escapeHtml(order.order_code)}" /><button class="admin-add-link" type="button">+ Añadir otro enlace</button></div><button class="button gold admin-deliver" type="button" data-order-id="${escapeHtml(order.id)}">Enviar y marcar entregado</button></div>` : '';
       const savedLink = Array.isArray(order.download_links) && order.download_links[0]?.url ? `<div class="admin-order-details"><div>Enlaces enviados<b>${order.download_links.map((link, index) => `<a class="admin-back admin-saved-link" target="_blank" rel="noreferrer" href="${escapeHtml(link.url)}">Abrir enlace ${index + 1} ↗</a>`).join('')}</b></div></div>` : '';
-      const receiptButton = order.receipt_path ? `<button class="admin-secondary admin-view-receipt" type="button" data-order-id="${escapeHtml(order.id)}" data-order-code="${escapeHtml(order.order_code)}">Ver comprobante</button>` : '';
+      const proofLabel = evidenceLabel(order);
+      const receiptButton = order.receipt_path ? `<button class="admin-secondary admin-view-receipt" type="button" data-order-id="${escapeHtml(order.id)}" data-order-code="${escapeHtml(order.order_code)}" data-proof-label="${escapeHtml(proofLabel)}">Ver ${escapeHtml(proofLabel)}</button>` : '';
       return `<article class="admin-order"><div class="admin-order-top"><div><b class="admin-order-code">${escapeHtml(order.order_code || 'SIN CÓDIGO')}</b><h2 class="admin-order-name">${escapeHtml(order.customer_name)}</h2><p class="admin-order-email">${escapeHtml(order.customer_email)}</p></div><span class="admin-order-state">${escapeHtml(labels[order.status] || order.status)}</span></div><div class="admin-order-details"><div>Productos<b>${escapeHtml(productsText(order.items))}</b></div><div>Total<b>$${escapeHtml(order.total_mxn)} MXN</b></div><div>Fecha<b>${new Date(order.created_at).toLocaleString('es-MX')}</b></div></div>${delivery}<div class="admin-order-actions">${receiptButton}<button class="admin-delete admin-delete-order" type="button" data-order-id="${escapeHtml(order.id)}" data-order-code="${escapeHtml(order.order_code)}">Eliminar pedido</button></div>${savedLink}</article>`;
     }).join('');
   }
 
   async function loadOrders() {
     setMessage('Actualizando pedidos…');
-    const { data, error } = await state.client.from('orders').select('id, order_code, customer_name, customer_email, items, total_mxn, status, created_at, download_links, receipt_path').order('created_at', { ascending: false });
+    const { data, error } = await state.client.from('orders').select('id, order_code, customer_name, customer_email, items, total_mxn, payment_method, submission_kind, status, created_at, download_links, receipt_path').order('created_at', { ascending: false });
     if (error) { setMessage('No fue posible cargar los pedidos. Vuelve a iniciar sesión e intenta de nuevo.', 'error'); return; }
     state.orders = data || []; setMessage(`${state.orders.length} pedido(s) encontrado(s).`, 'success'); render();
   }
@@ -59,6 +62,10 @@
     try {
       const data = await getOrderTool({ action: 'receipt', order_id: button.dataset.orderId });
       receiptTitle.textContent = `Pedido ${button.dataset.orderCode}`;
+      const proofLabel = button.dataset.proofLabel || 'comprobante de pago';
+      const isRequirement = proofLabel === 'captura del requisito';
+      receiptEyebrow.innerHTML = `<span></span> ${isRequirement ? 'PRUEBA DEL REQUISITO' : 'COMPROBANTE DE PAGO'}`;
+      receiptTitle.textContent = `${isRequirement ? 'Captura' : 'Comprobante'} · ${button.dataset.orderCode}`;
       receiptPreview.innerHTML = data.mime_type?.startsWith('image/')
         ? `<img src="${escapeHtml(data.signed_url)}" alt="Comprobante ${escapeHtml(button.dataset.orderCode)}" />`
         : `<iframe src="${escapeHtml(data.signed_url)}" title="Comprobante ${escapeHtml(button.dataset.orderCode)}"></iframe>`;

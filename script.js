@@ -35,10 +35,12 @@ const giftPreset = products.find(p => p.name === 'Preset de regalo');
 Object.assign(giftPreset, {
   category: 'Worship',
   tags: ['Worship', 'High Gain', 'Ambient'],
+  claimRequired: true,
+  claimRequirement: 'Sigue a @kayguitar14 en Instagram y sube una captura donde se vea que ya sigues la cuenta.',
   art: "linear-gradient(135deg,#0001,#0008),url('assets/preset-de-regalo.png') center/cover",
   image: 'assets/preset-de-regalo.png',
   demo: 'https://www.tiktok.com/@carlos_martineztf/video/7670328884759498005',
-  description: 'Para recibir este preset gratis, debes seguir a @kayguitar14 en Instagram y enviar por WhatsApp una captura de pantalla que lo compruebe. El preset está diseñado para worship con un carácter high gain: ofrece ganancia, sustain y definición para líneas melódicas y momentos de mayor intensidad. Conserva un ambiente amplio para que el sonido se mantenga grande, expresivo y listo para destacar en la mezcla.'
+  description: 'Preset pensado para worship con un carácter high gain: ofrece ganancia, sustain y definición para líneas melódicas y momentos de mayor intensidad. Conserva un ambiente amplio para que el sonido se mantenga grande, expresivo y listo para destacar en la mezcla.'
 });
 const CART_STORAGE_KEY = 'kay-guitar-cart-v1';
 function loadSavedCart() {
@@ -56,6 +58,27 @@ function saveCart() {
   } catch (_) { /* El carrito sigue funcionando aunque el navegador bloquee el almacenamiento. */ }
 }
 const grid = document.querySelector('#product-grid'); let cart = loadSavedCart();
+function isGiftProduct(product) { return Boolean(product?.claimRequired || product?.id === 'preset-regalo'); }
+function addProductToCart(product) {
+  if (!product) return false;
+  const hasGift = cart.some(isGiftProduct);
+  const hasPaid = cart.some(item => !isGiftProduct(item));
+  if (isGiftProduct(product) && hasPaid) {
+    window.alert('El preset de regalo debe solicitarse por separado de los productos con pago. Termina o vacía tu carrito primero.');
+    return false;
+  }
+  if (!isGiftProduct(product) && hasGift) {
+    window.alert('Primero solicita el preset de regalo por separado o quítalo del carrito para añadir productos con pago.');
+    return false;
+  }
+  if (isGiftProduct(product) && cart.some(item => item.id === product.id)) {
+    window.alert('El preset de regalo ya está en tu carrito. Puedes solicitar una sola vez por pedido.');
+    return false;
+  }
+  cart.push(product);
+  renderCart();
+  return true;
+}
 function renderProducts(list = products) {
   grid.innerHTML = list.length ? list.map((p, index) => `<article class="product" data-demo="${products.indexOf(p)}"><div class="product-image" style="--art:${p.art}"><span class="product-tag">${p.category}</span>${p.image ? '' : '<div class="speaker"></div>'}</div><div class="product-body"><h3>${p.name}</h3><div class="badges">${(p.tags || []).map(b => `<span>${b}</span>`).join('')}${p.badges.map(b => `<span>${b}</span>`).join('')}</div><div class="product-bottom"><div class="price"><strong>${p.price ? '$' + p.price : 'GRATIS'}</strong> <small>${p.price ? 'MXN · ≈ $' + p.usd + ' USD' : 'Sigue @kayguitar14 y envía captura'}</small></div><button class="add-button" data-index="${products.indexOf(p)}">+ Añadir</button></div><button class="demo-button" data-demo="${products.indexOf(p)}">Ver descripción y demo ↗</button></div></article>`).join('') : '<p>No encontramos presets con esa búsqueda.</p>';
 }
@@ -73,9 +96,7 @@ document.addEventListener('click', e => {
   const addTarget = e.target.closest('.add-button');
   if(addTarget) {
     const product = products[addTarget.dataset.index];
-    if (!product) return;
-    cart.push(product);
-    renderCart();
+    if (!addProductToCart(product)) return;
     document.querySelector('.preset-modal').classList.remove('open');
     document.querySelector('.cart-panel').classList.add('open');
     document.querySelector('.overlay').classList.add('open');
@@ -97,6 +118,15 @@ const presetModal = document.querySelector('.preset-modal');
 function openPreset(p) {
   document.querySelector('#preset-modal-title').textContent = p.name;
   document.querySelector('#preset-modal-description').textContent = p.description || 'Este preset fue creado para darte un sonido inspirador, listo para tocar en tu Valeton GP200.';
+  const requirement = document.querySelector('#preset-requirement');
+  const requirementCopy = document.querySelector('#preset-requirement-copy');
+  if (p.claimRequired && p.claimRequirement) {
+    requirement.hidden = false;
+    requirementCopy.textContent = p.claimRequirement;
+  } else {
+    requirement.hidden = true;
+    requirementCopy.textContent = '';
+  }
   document.querySelector('#preset-modal-price').textContent = p.price ? `$${p.price} MXN · ≈ $${p.usd} USD` : 'GRATIS';
   document.querySelector('#preset-modal-tags').innerHTML = (p.tags || [p.category]).map(tag => `<span>${tag}</span>`).join('') + p.badges.map(tag => `<span>${tag}</span>`).join('');
   const image = document.querySelector('#preset-modal-image'); image.style.backgroundImage = p.image ? `url('${p.image}')` : p.art;
@@ -205,7 +235,7 @@ async function refreshProfileOrders() {
   const open = data.filter(order => ['pending_payment', 'pending_validation'].includes(order.status));
   const render = (orders, emptyTitle, emptyCopy, icon, pendingOrders = false) => orders.length
     ? orders.map(order => {
-      const canContinue = pendingOrders && order.payment_method === 'bank_transfer' && order.status === 'pending_payment';
+      const canContinue = pendingOrders && ['bank_transfer', 'paypal_qr', 'gift_claim'].includes(order.payment_method) && order.status === 'pending_payment';
       const canCancel = pendingOrders && order.status === 'pending_payment';
       if (canContinue || canCancel) {
         return `<div class="profile-order is-pending"><b>${order.order_code}</b><span>${orderStatusLabel(order.status)}</span><small>$${order.total_mxn} MXN</small><div class="profile-order-actions">${canContinue ? `<button type="button" class="profile-order-action continue" data-resume-order="${order.id}">Continuar pedido →</button>` : ''}<button type="button" class="profile-order-action cancel" data-cancel-order="${order.id}">Cancelar pedido</button></div></div>`;
@@ -226,7 +256,7 @@ async function refreshProfileOrders() {
     const selectedOrder = open.find(order => order.id === button.dataset.resumeOrder);
     if (!selectedOrder) return;
     closeProfileModal();
-    window.KayGuitarCheckout?.resumeBankTransfer(selectedOrder);
+    window.KayGuitarCheckout?.resumeManualOrder(selectedOrder);
   };
 }
 async function cancelPendingOrder(orderId) {

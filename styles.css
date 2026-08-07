@@ -334,7 +334,7 @@ body.profile-modal-open{overflow:hidden;touch-action:none}
 .checkout-modal{position:fixed;z-index:23;left:50%;top:50%;width:min(940px,94vw);max-height:90vh;overflow:auto;background:#171614;border:1px solid #65563e;box-shadow:0 24px 70px #000c;padding:42px;transform:translate(-50%,-46%);opacity:0;pointer-events:none;transition:.25s}
 .checkout-modal.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
 .close-checkout{position:absolute;right:16px;top:12px;border:0;background:none;color:var(--cream);font-size:29px;cursor:pointer}
-.checkout-head h2,.bank-content h2,.checkout-finish h2{font-size:59px;margin-bottom:28px}
+.checkout-head h2,.bank-content h2,.qr-content h2,.gift-content h2,.checkout-finish h2{font-size:59px;margin-bottom:28px}
 .checkout-layout{display:grid;grid-template-columns:1.3fr .9fr;gap:16px}
 .checkout-order,.checkout-side{border:1px solid #3d3932;padding:23px}
 .checkout-order h3{font:600 26px 'Barlow Condensed';text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
@@ -356,14 +356,18 @@ body.profile-modal-open{overflow:hidden;touch-action:none}
 .payment-methods input{accent-color:#caa15c;margin-top:4px}
 .payment-methods b{display:block;font:600 18px 'Barlow Condensed'}
 .payment-methods small{display:block;color:#9b9489;font-size:9px;line-height:1.5;margin-top:2px}
+.gift-checkout-note{border:1px solid #725538;background:#251f15;margin-top:19px;padding:13px 14px}
+.gift-checkout-note p,.gift-requirement p,.preset-requirement p{margin:0 0 7px;color:var(--gold);font:800 9px Manrope;letter-spacing:1px}
+.gift-checkout-note b{display:block;font:600 19px 'Barlow Condensed'}
+.gift-checkout-note small{display:block;color:#c5b9a5;font-size:10px;line-height:1.6;margin-top:4px}
 .checkout-message{min-height:18px;color:#aaa398;font-size:10px;line-height:1.5;margin:13px 0}
 .checkout-message.error{color:#e58c7d}
 .checkout-message.success{color:#c7e5b8}
 .checkout-pay-button{width:100%}
 .checkout-pay-button:disabled,.receipt-upload .button:disabled{opacity:.56;cursor:wait}
 .paypal-buttons{margin-top:14px}
-.bank-content{max-width:610px;margin:auto}
-.bank-intro,.checkout-finish>p:not(.eyebrow){color:#aaa399;line-height:1.75;font-size:12px;max-width:460px}
+.bank-content,.qr-content,.gift-content{max-width:610px;margin:auto}
+.bank-intro,.qr-intro,.gift-intro,.checkout-finish>p:not(.eyebrow){color:#aaa399;line-height:1.75;font-size:12px;max-width:500px}
 .bank-code{border:1px solid #6d5834;background:#211c14;margin:24px 0;padding:16px 18px;display:flex;justify-content:space-between;align-items:center}
 .bank-code span{font:800 9px Manrope;color:#bdaf95;letter-spacing:1px}
 .bank-code strong{font:600 28px 'Barlow Condensed';letter-spacing:1.5px;color:var(--gold)}
@@ -377,6 +381,16 @@ body.profile-modal-open{overflow:hidden;touch-action:none}
 .receipt-upload input{width:100%;background:#10100f;border:1px dashed #716143;color:#cdc3b5;padding:12px;font:11px Manrope}
 .receipt-upload small{display:block;margin:8px 0 14px;color:#958e84;font-size:9px}
 .receipt-upload .button{width:100%}
+.qr-payment-card{display:grid;grid-template-columns:minmax(220px,320px) 1fr;gap:20px;align-items:center;border:1px solid #3d3931;background:#141310;margin:22px 0;padding:18px}
+.qr-payment-card img{display:block;width:100%;max-width:320px;justify-self:center;background:#f5f4ef;padding:7px}
+.qr-payment-card b{display:block;color:var(--cream);font:600 21px/1 'Barlow Condensed';letter-spacing:.2px}
+.qr-payment-card small{display:block;color:#aaa399;font-size:10px;line-height:1.7;margin-top:8px}
+.qr-total{display:flex;align-items:center;justify-content:space-between;border-top:1px solid #3b3731;border-bottom:1px solid #3b3731;margin:0 0 22px;padding:14px 0;color:#bdaf95;font:800 9px Manrope;letter-spacing:1px;text-transform:uppercase}
+.qr-total strong{color:var(--gold);font:600 27px 'Barlow Condensed';letter-spacing:.4px}
+.gift-requirement,.preset-requirement{border:1px solid #725538;background:#251f15;padding:15px 16px;margin:22px 0}
+.gift-requirement strong,.preset-requirement strong{display:block;color:#f0dfc2;font:600 19px/1.2 'Barlow Condensed';letter-spacing:.2px}
+.preset-requirement{margin:18px 0}
+.preset-requirement[hidden]{display:none}
 .checkout-finish{max-width:560px;margin:auto;padding:25px 0}
 .checkout-finish>span{width:45px;height:45px;border:1px solid var(--gold);border-radius:50%;display:grid;place-items:center;color:var(--gold);font-size:25px;margin-bottom:20px}
 .checkout-hidden{display:none!important}
@@ -399,7 +413,7 @@ body.profile-modal-open{overflow:hidden;touch-action:none}
 .profile-order-action.cancel:hover{background:#2b1715}
 
 @media(max-width:650px){.checkout-modal{width:94vw;max-height:92vh;padding:29px 20px}
-.checkout-head h2,.bank-content h2,.checkout-finish h2{font-size:45px}
+.checkout-head h2,.bank-content h2,.qr-content h2,.gift-content h2,.checkout-finish h2{font-size:45px}
 .checkout-layout{grid-template-columns:1fr}
 .checkout-order,.checkout-side{padding:17px}
 .checkout-line{gap:9px}
@@ -410,6 +424,8 @@ body.profile-modal-open{overflow:hidden;touch-action:none}
 .bank-code{padding:14px}
 .bank-code strong{font-size:24px}
 .close-checkout{right:8px;top:4px}
+.qr-payment-card{grid-template-columns:1fr;padding:16px}
+.qr-payment-card img{max-width:315px}
 }
 
 .bank-order-summary{border:1px solid #3b3731;margin:0 0 22px;padding:14px 16px}
